@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 400" fill="none">
+  <!-- Body -->
+  <rect x="20" y="10" width="160" height="380" rx="32" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="3"/>
+  <!-- Screen -->
+  <rect x="30" y="52" width="140" height="286" rx="5" fill="#F3F4F6"/>
+  <!-- Dynamic Island -->
+  <rect x="77" y="26" width="46" height="14" rx="7" fill="#E5E7EB"/>
+  <circle cx="116" cy="33" r="4" fill="#D1D5DB"/>
+  <!-- Home indicator -->
+  <rect x="75" y="372" width="50" height="5" rx="2.5" fill="#E5E7EB"/>
+  <!-- Right buttons (sleep + volume) -->
+  <rect x="180" y="115" width="7" height="52" rx="3.5" fill="#E5E7EB"/>
+  <rect x="180" y="180" width="7" height="38" rx="3.5" fill="#E5E7EB"/>
+  <!-- Left buttons (mute + volume) -->
+  <rect x="13" y="92" width="7" height="28" rx="3.5" fill="#E5E7EB"/>
+  <rect x="13" y="135" width="7" height="54" rx="3.5" fill="#E5E7EB"/>
+  <rect x="13" y="200" width="7" height="54" rx="3.5" fill="#E5E7EB"/>
+</svg>

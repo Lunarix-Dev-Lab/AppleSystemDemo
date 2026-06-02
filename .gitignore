@@ -1,0 +1,49 @@
+# ── Credenciales y secretos ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ── Node / Angular ────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/dist-ssr/
+*.tgz
+
+# ── Imágenes subidas por usuarios ─────────────────────────────────────────────
+backend/media/
+
+# ── Base de datos local ───────────────────────────────────────────────────────
+*.sqlite3
+*.db
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# (docker-compose.yml SÍ se sube, solo ignoramos overrides locales)
+docker-compose.override.yml
