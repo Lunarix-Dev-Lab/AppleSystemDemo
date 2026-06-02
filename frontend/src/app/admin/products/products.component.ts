@@ -165,7 +165,7 @@ import { ProductService } from '../../core/product.service';
       <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
 
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" (click)="closeModal()"></div>
+        <div class="absolute inset-0 bg-black/50" (click)="closeModal()"></div>
 
         <!-- Panel -->
         <div class="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl
