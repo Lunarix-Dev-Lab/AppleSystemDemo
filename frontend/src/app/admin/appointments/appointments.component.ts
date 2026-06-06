@@ -2,10 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  PLATFORM_ID,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 import { Appointment, AppointmentStatus } from '../../core/appointment.models';
 import { AppointmentService } from '../../core/appointment.service';
@@ -18,14 +21,45 @@ interface Tab {
 @Component({
   selector: 'app-appointments',
   standalone: true,
+  imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-8 max-w-6xl mx-auto">
+    <div class="p-4 sm:p-8 max-w-6xl mx-auto">
 
       <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-2xl font-semibold text-gray-900">Turnos</h1>
-        <p class="text-sm text-gray-400 mt-0.5">{{ appointments().length }} en total</p>
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">Turnos</h1>
+          <p class="text-sm text-gray-400 mt-0.5">{{ appointments().length }} en total</p>
+        </div>
+
+        <!-- limpiar cancelados -->
+        @if (cancelledCount() > 0) {
+          <button (click)="deleteCancelled()"
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                         border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-500
+                         transition-colors min-h-[40px]">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Limpiar cancelados ({{ cancelledCount() }})
+          </button>
+        }
+
+        <!-- filtro activos / todos -->
+        <button (click)="toggleActive()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                       transition-colors min-h-[40px]"
+                [class]="onlyActive()
+                  ? 'bg-black text-white hover:bg-gray-800'
+                  : 'border border-gray-200 text-gray-600 hover:bg-gray-50'">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+          </svg>
+          {{ onlyActive() ? 'Ver todos' : 'Solo activos' }}
+        </button>
       </div>
 
       <!-- Status tabs -->
@@ -33,15 +67,13 @@ interface Tab {
         @for (tab of tabs; track tab.label) {
           <button
             (click)="filterStatus.set(tab.value)"
-            class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
             [class]="filterStatus() === tab.value
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'"
           >
             {{ tab.label }}
-            <span class="ml-1.5 text-xs text-gray-400">
-              {{ tabCount(tab.value) }}
-            </span>
+            <span class="ml-1.5 text-xs text-gray-400">{{ tabCount(tab.value) }}</span>
           </button>
         }
       </div>
@@ -62,43 +94,45 @@ interface Tab {
           <p class="text-sm font-medium text-gray-400">Sin turnos en esta categoría.</p>
         </div>
       } @else {
-        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <table class="w-full">
+        <!-- Wrapper con overflow-x-auto para responsive (QA-ADM-004) -->
+        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto">
+          <table class="w-full min-w-[700px]">
             <thead>
               <tr class="border-b border-gray-100">
-                <th class="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Cliente</th>
-                <th class="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Producto</th>
-                <th class="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fecha y hora</th>
-                <th class="text-center px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
-                <th class="px-5 py-3.5"></th>
+                <th class="text-left px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Cliente</th>
+                <th class="text-left px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Producto</th>
+                <th class="text-left px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fecha y hora</th>
+                <th class="text-center px-4 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
+                <th class="px-4 py-3.5"></th>
               </tr>
             </thead>
             <tbody>
               @for (apt of filtered(); track apt.id) {
                 <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
 
-                  <!-- Cliente -->
-                  <td class="px-5 py-4">
+                  <!-- Cliente + notas inline -->
+                  <td class="px-4 py-4">
                     <p class="text-sm font-medium text-gray-900">{{ apt.guest_name }}</p>
                     <p class="text-xs text-gray-400 mt-0.5">{{ apt.guest_email }}</p>
-                    @if (apt.guest_phone) {
-                      <p class="text-xs text-gray-400">{{ apt.guest_phone }}</p>
+                    <p class="text-xs text-gray-400">{{ apt.guest_phone }}</p>
+                    @if (apt.notes) {
+                      <p class="text-xs text-gray-500 italic mt-1">{{ apt.notes }}</p>
                     }
                   </td>
 
                   <!-- Producto -->
-                  <td class="px-5 py-4 hidden sm:table-cell">
+                  <td class="px-4 py-4 hidden sm:table-cell">
                     <span class="text-sm text-gray-600">{{ apt.product?.name ?? '—' }}</span>
                   </td>
 
                   <!-- Fecha y hora -->
-                  <td class="px-5 py-4">
+                  <td class="px-4 py-4">
                     <p class="text-sm font-medium text-gray-900 capitalize">{{ formatDate(apt.slot_datetime) }}</p>
                     <p class="text-xs text-gray-400">{{ formatTime(apt.slot_datetime) }}</p>
                   </td>
 
                   <!-- Estado -->
-                  <td class="px-5 py-4 text-center">
+                  <td class="px-4 py-4 text-center">
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
                           [class]="statusClass(apt.status)">
                       <span class="w-1.5 h-1.5 rounded-full" [class]="statusDotClass(apt.status)"></span>
@@ -107,8 +141,9 @@ interface Tab {
                   </td>
 
                   <!-- Acciones -->
-                  <td class="px-5 py-4">
-                    <div class="flex items-center justify-end gap-2">
+                  <td class="px-4 py-4">
+                    <div class="flex items-center justify-end gap-2 flex-wrap">
+
                       @if (apt.status === 'pending_confirmation') {
                         <button
                           (click)="updateStatus(apt, 'confirmed')"
@@ -123,9 +158,27 @@ interface Tab {
                           Confirmar
                         </button>
                       }
-                      @if (apt.status !== 'cancelled') {
+
+                      @if (apt.status === 'confirmed') {
+                        <!-- QA-ADM-001: marcar como realizado -->
                         <button
-                          (click)="updateStatus(apt, 'cancelled')"
+                          (click)="updateStatus(apt, 'realizado')"
+                          [disabled]="updating() === apt.id"
+                          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                                 bg-teal-50 text-teal-600 hover:bg-teal-100
+                                 text-xs font-medium transition-colors disabled:opacity-40 min-h-[32px]"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                          </svg>
+                          Realizado
+                        </button>
+                      }
+
+                      @if (apt.status !== 'cancelled' && apt.status !== 'realizado') {
+                        <!-- QA-ADM-005: abre modal para ingresar motivo antes de cancelar -->
+                        <button
+                          (click)="openCancelModal(apt)"
                           [disabled]="updating() === apt.id"
                           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                                  bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500
@@ -137,6 +190,7 @@ interface Tab {
                           Cancelar
                         </button>
                       }
+
                     </div>
                   </td>
 
@@ -147,43 +201,144 @@ interface Tab {
         </div>
       }
     </div>
+
+    <!-- QA-ADM-005: modal de motivo de cancelación -->
+    @if (cancelTarget()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50" (click)="closeCancelModal()"></div>
+        <div class="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl p-6">
+          <h3 class="text-base font-semibold text-gray-900 mb-1">Cancelar turno</h3>
+          <p class="text-sm text-gray-400 mb-4">
+            Podés incluir un motivo. El cliente lo recibirá en el email de cancelación.
+          </p>
+          <label for="cancel-reason" class="block text-sm font-medium text-gray-700 mb-1.5">
+            Motivo <span class="text-gray-400 font-normal">(opcional)</span>
+          </label>
+          <textarea
+            id="cancel-reason"
+            [ngModel]="cancelReason()"
+            (ngModelChange)="cancelReason.set($event)"
+            rows="3"
+            maxlength="300"
+            placeholder="Ej: Por inconvenientes del local, lamentamos el aviso..."
+            class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none
+                   focus:outline-none focus:ring-2 focus:ring-black transition mb-4"
+          ></textarea>
+          <div class="flex gap-3">
+            <button (click)="closeCancelModal()"
+                    class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm
+                           text-gray-600 hover:bg-gray-50 transition-colors min-h-[44px]">
+              Volver
+            </button>
+            <button (click)="confirmCancel()"
+                    [disabled]="updating() !== null"
+                    class="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium
+                           hover:bg-red-600 disabled:opacity-40 transition-colors min-h-[44px]">
+              {{ updating() ? 'Cancelando…' : 'Cancelar turno' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export class AppointmentsComponent implements OnInit {
   private readonly appointmentService = inject(AppointmentService);
+  private readonly platform = inject(PLATFORM_ID);
 
   readonly appointments = signal<Appointment[]>([]);
   readonly loading = signal(true);
   readonly updating = signal<number | null>(null);
   readonly filterStatus = signal<AppointmentStatus | null>(null);
 
+  // Filtro activos por defecto
+  readonly onlyActive = signal(true);
+
+  // QA-ADM-005: modal de motivo de cancelación
+  readonly cancelTarget = signal<Appointment | null>(null);
+  readonly cancelReason = signal('');
+
+  // QA-ADM-001 + QA-ADM-003: tabs con "Realizados" + QA-ADM-007: "Activos"
   readonly tabs: Tab[] = [
     { label: 'Todos', value: null },
     { label: 'Pendientes', value: 'pending_confirmation' },
     { label: 'Confirmados', value: 'confirmed' },
+    { label: 'Realizados', value: 'realizado' },
     { label: 'Cancelados', value: 'cancelled' },
   ];
 
+  readonly cancelledCount = computed(() =>
+    this.appointments().filter(a => a.status === 'cancelled').length
+  );
+
   readonly filtered = computed(() => {
     const status = this.filterStatus();
-    const all = this.appointments();
-    return status ? all.filter(a => a.status === status) : all;
+    const active = this.onlyActive();
+    const list = this.appointments();
+    // Si hay una tab específica seleccionada, toma prioridad sobre el filtro activos
+    if (status) return list.filter(a => a.status === status);
+    if (active) return list.filter(a =>
+      a.status === 'pending_confirmation' || a.status === 'confirmed'
+    );
+    return list;
   });
 
   ngOnInit(): void {
+    if (!isPlatformBrowser(this.platform)) return;
     this.appointmentService.list().subscribe({
       next: list => { this.appointments.set(list); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
 
+  deleteCancelled(): void {
+    const count = this.cancelledCount();
+    if (!confirm(`¿Eliminar definitivamente los ${count} turno(s) cancelado(s)? Esta acción no se puede deshacer.`)) return;
+    this.appointmentService.deleteCancelled().subscribe({
+      next: () => {
+        this.appointments.update(list => list.filter(a => a.status !== 'cancelled'));
+        if (this.filterStatus() === 'cancelled') this.filterStatus.set(null);
+      },
+    });
+  }
+
+  toggleActive(): void {
+    const next = !this.onlyActive();
+    this.onlyActive.set(next);
+    if (next) this.filterStatus.set(null); // volver a "Todos" al activar el filtro
+  }
+
   tabCount(status: AppointmentStatus | null): number {
     const all = this.appointments();
-    return status ? all.filter(a => a.status === status).length : all.length;
+    if (!status) return all.length;
+    return all.filter(a => a.status === status).length;
+  }
+
+  openCancelModal(apt: Appointment): void {
+    this.cancelTarget.set(apt);
+    this.cancelReason.set('');
+  }
+
+  closeCancelModal(): void {
+    this.cancelTarget.set(null);
+    this.cancelReason.set('');
+  }
+
+  confirmCancel(): void {
+    const apt = this.cancelTarget();
+    if (!apt) return;
+    this.updating.set(apt.id);
+    this.appointmentService.updateStatus(apt.id, 'cancelled', this.cancelReason() || undefined).subscribe({
+      next: updated => {
+        this.appointments.update(list => list.map(a => a.id === updated.id ? updated : a));
+        this.updating.set(null);
+        this.closeCancelModal();
+      },
+      error: () => this.updating.set(null),
+    });
   }
 
   updateStatus(apt: Appointment, status: AppointmentStatus): void {
-    if (status === 'cancelled' && !confirm(`¿Cancelar el turno de ${apt.guest_name}?`)) return;
     this.updating.set(apt.id);
     this.appointmentService.updateStatus(apt.id, status).subscribe({
       next: updated => {
@@ -218,8 +373,9 @@ export class AppointmentsComponent implements OnInit {
       confirmed: 'Confirmado',
       cancelled: 'Cancelado',
       rescheduled: 'Reprogramado',
+      realizado: 'Realizado',
     };
-    return labels[status];
+    return labels[status] ?? status;
   }
 
   statusClass(status: AppointmentStatus): string {
@@ -228,8 +384,9 @@ export class AppointmentsComponent implements OnInit {
       confirmed: 'bg-green-50 text-green-600',
       cancelled: 'bg-gray-100 text-gray-400',
       rescheduled: 'bg-blue-50 text-blue-600',
+      realizado: 'bg-teal-50 text-teal-600',
     };
-    return classes[status];
+    return classes[status] ?? 'bg-gray-100 text-gray-400';
   }
 
   statusDotClass(status: AppointmentStatus): string {
@@ -238,7 +395,8 @@ export class AppointmentsComponent implements OnInit {
       confirmed: 'bg-green-500',
       cancelled: 'bg-gray-400',
       rescheduled: 'bg-blue-500',
+      realizado: 'bg-teal-500',
     };
-    return classes[status];
+    return classes[status] ?? 'bg-gray-400';
   }
 }

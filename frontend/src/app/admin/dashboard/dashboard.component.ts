@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 
@@ -109,11 +110,13 @@ interface Stats {
 export class DashboardComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
+  private readonly platform = inject(PLATFORM_ID);
 
   readonly stats = signal<Stats>({ products: 0, today_appointments: 0, pending_appointments: 0 });
   readonly loading = signal(true);
 
   ngOnInit(): void {
+    if (!isPlatformBrowser(this.platform)) return;
     if (!this.auth.currentUser()) {
       this.auth.loadProfile().subscribe();
     }

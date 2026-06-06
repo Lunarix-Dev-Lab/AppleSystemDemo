@@ -2,18 +2,19 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
-  PLATFORM_ID,
+  afterNextRender,
   inject,
   signal,
 } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
+import { forkJoin } from 'rxjs';
 
 import { THEME } from '../../../theme.config';
 
 import { Product, ProductImage } from '../../core/product.models';
 import { ProductService } from '../../core/product.service';
+import { AppointmentService } from '../../core/appointment.service';
 
 @Component({
   selector: 'app-catalog',
@@ -38,11 +39,25 @@ import { ProductService } from '../../core/product.service';
       <main class="max-w-[1200px] mx-auto px-6 pb-28">
 
         @if (loading()) {
-          <!-- Skeleton (ui-ux-pro-max §3: skeleton screens para operaciones >300ms) -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             @for (_ of skeleton; track $index) {
               <div class="rounded-3xl bg-gray-100 animate-pulse" style="aspect-ratio:3/4;"></div>
             }
+          </div>
+
+        } @else if (loadingError()) {
+          <div class="flex flex-col items-center justify-center py-32 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-sm font-medium text-gray-500 mb-1">No se pudo cargar el catálogo</p>
+            <p class="text-xs text-gray-400 mb-5">Verificá tu conexión e intentá de nuevo.</p>
+            <button (click)="reloadProducts()"
+                    class="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-xl
+                           hover:bg-gray-800 transition-colors min-h-[44px]">
+              Reintentar
+            </button>
           </div>
 
         } @else if (products().length === 0) {
@@ -58,19 +73,40 @@ import { ProductService } from '../../core/product.service';
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             @for (product of products(); track product.id) {
 
-              <!-- Card
-                   ui-ux-pro-max §4: style-match (minimalism, Apple aesthetic)
-                   ui-ux-pro-max §7: animation transform/opacity, 300ms ease-out
-              -->
               <article
-                class="group flex flex-col rounded-3xl overflow-hidden
-                       border border-gray-100
-                       hover:shadow-2xl hover:shadow-gray-200/70
+                class="group flex flex-col rounded-3xl overflow-hidden border border-gray-100
                        transition-shadow duration-300"
+                [class]="product.stock === 0
+                  ? 'opacity-70'
+                  : 'hover:shadow-2xl hover:shadow-gray-200/70'"
               >
                 <!-- Image area -->
                 <div class="relative flex items-center justify-center bg-gray-50 overflow-hidden"
                      style="aspect-ratio:4/5;">
+
+                  @if (product.stock === 0) {
+                    <span class="absolute top-3 left-3 z-10 text-xs font-semibold px-2.5 py-1
+                                 bg-gray-900 text-white rounded-full">
+                      Sin Stock
+                    </span>
+                  }
+
+                  @if (product.is_sealed) {
+                    <span class="absolute top-3 right-3 z-10 text-xs font-semibold px-2.5 py-1
+                                 bg-black text-white rounded-full tracking-wide">
+                      Sellado
+                    </span>
+                  } @else if (product.battery_health) {
+                    <span class="absolute top-3 right-3 z-10 inline-flex items-center gap-1
+                                 text-xs font-semibold px-2.5 py-1 bg-green-500 text-white rounded-full">
+                      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="2" y="7" width="16" height="11" rx="2"/>
+                        <path d="M22 11v3" stroke-linecap="round"/>
+                        <path d="M6 12h8" stroke-linecap="round"/>
+                      </svg>
+                      {{ product.battery_health }}%
+                    </span>
+                  }
 
                   @if (primaryImage(product); as img) {
                     <img
@@ -82,7 +118,6 @@ import { ProductService } from '../../core/product.service';
                              transition-transform duration-500 ease-out"
                     />
                   } @else {
-                    <!-- Placeholder: phone outline -->
                     <svg class="w-20 h-20 text-gray-200" fill="none" viewBox="0 0 24 24"
                          stroke="currentColor" stroke-width="0.8">
                       <path stroke-linecap="round" stroke-linejoin="round"
@@ -91,7 +126,7 @@ import { ProductService } from '../../core/product.service';
                   }
                 </div>
 
-                <!-- Info area (ui-ux-pro-max §6: type scale, §5: spacing 8px grid) -->
+                <!-- Info area -->
                 <div class="flex flex-col flex-1 px-6 pt-5 pb-6 bg-white gap-3">
 
                   <div>
@@ -117,10 +152,7 @@ import { ProductService } from '../../core/product.service';
                     </div>
                   }
 
-                  <!-- Price + CTA
-                       ui-ux-pro-max §2: touch target min 44px (py-3 + text = ~44px)
-                       ui-ux-pro-max §8: primary-action one per card
-                  -->
+                  <!-- Price + CTA -->
                   <div class="flex items-center justify-between mt-auto pt-1">
                     <div>
                       <p class="text-xs text-gray-400">Desde</p>
@@ -129,17 +161,23 @@ import { ProductService } from '../../core/product.service';
                       </p>
                     </div>
 
-                    <a
-                      [routerLink]="['/reservar']"
-                      [queryParams]="{ product: product.id }"
-                      class="min-h-[44px] px-5 py-2.5 bg-black text-white text-sm font-medium
-                             rounded-full hover:bg-gray-800
-                             active:scale-95
-                             transition-all duration-150 ease-out
-                             flex items-center justify-center"
-                    >
-                      Consultar
-                    </a>
+                    @if (product.stock > 0) {
+                      <a
+                        [routerLink]="['/reservar']"
+                        [queryParams]="{ product: product.id }"
+                        class="min-h-[44px] px-5 py-2.5 bg-black text-white text-sm font-medium
+                               rounded-full hover:bg-gray-800 active:scale-95
+                               transition-all duration-150 ease-out flex items-center justify-center"
+                      >
+                        Consultar
+                      </a>
+                    } @else {
+                      <span class="min-h-[44px] px-5 py-2.5 border border-gray-200 text-gray-400
+                                   text-sm font-medium rounded-full flex items-center justify-center
+                                   cursor-not-allowed">
+                        Sin Stock
+                      </span>
+                    }
                   </div>
 
                 </div>
@@ -154,31 +192,48 @@ import { ProductService } from '../../core/product.service';
   `,
 })
 export class CatalogComponent implements OnInit {
-  private readonly platform = inject(PLATFORM_ID);
   private readonly productService = inject(ProductService);
+  private readonly appointmentService = inject(AppointmentService);
 
   readonly storeName = THEME.store.name;
   readonly tagline = THEME.store.tagline;
+
+  readonly products = signal<Product[]>([]);
+  readonly currency = signal<'ARS' | 'USD'>('ARS');
+  readonly usdRate = signal(1000);
+  readonly loading = signal(true);
+  readonly loadingError = signal(false);
+  readonly skeleton = Array(6);
 
   constructor() {
     const pageTitle = `Catálogo — ${THEME.store.name}`;
     inject(Title).setTitle(pageTitle);
     inject(Meta).updateTag({ name: 'description', content: THEME.meta.description });
     inject(Meta).updateTag({ property: 'og:title', content: pageTitle });
+
+    afterNextRender(() => this._load());
   }
 
-  readonly products = signal<Product[]>([]);
-  readonly loading = signal(true);
-  readonly skeleton = Array(6);
+  ngOnInit(): void {}
 
-  ngOnInit(): void {
-    if (!isPlatformBrowser(this.platform)) {
-      this.loading.set(false);
-      return;
-    }
-    this.productService.list().subscribe({
-      next: p => { this.products.set(p); this.loading.set(false); },
-      error: () => this.loading.set(false),
+  reloadProducts(): void {
+    this._load();
+  }
+
+  private _load(): void {
+    this.loading.set(true);
+    this.loadingError.set(false);
+    forkJoin({
+      products: this.productService.list(),
+      schedule: this.appointmentService.getSchedule(),
+    }).subscribe({
+      next: ({ products, schedule }) => {
+        this.products.set(products);
+        this.currency.set(schedule.config.display_currency);
+        this.usdRate.set(schedule.config.usd_rate);
+        this.loading.set(false);
+      },
+      error: () => { this.loading.set(false); this.loadingError.set(true); },
     });
   }
 
@@ -187,6 +242,11 @@ export class CatalogComponent implements OnInit {
   }
 
   formatPrice(price: number): string {
-    return `$${Number(price).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    const p = Number(price);
+    if (this.currency() === 'USD') {
+      const usd = Math.round(p / this.usdRate());
+      return `USD ${usd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    }
+    return `$${p.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
   }
 }

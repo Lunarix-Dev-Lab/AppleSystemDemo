@@ -29,6 +29,8 @@ class Product(Base):
     storage_options: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_sealed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    battery_health: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

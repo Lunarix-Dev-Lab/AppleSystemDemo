@@ -36,6 +36,11 @@ export const routes: Routes = [
           import('./public/booking/booking-confirm.component').then(m => m.BookingConfirmComponent),
       },
       {
+        path: 'turnos/cancelar',
+        loadComponent: () =>
+          import('./public/cancel/cancel-lookup.component').then(m => m.CancelLookupComponent),
+      },
+      {
         path: 'turnos/cancelar/:token',
         loadComponent: () =>
           import('./public/cancel/cancel.component').then(m => m.CancelComponent),

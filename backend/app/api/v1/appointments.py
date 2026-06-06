@@ -1,7 +1,10 @@
+from collections import defaultdict
 from datetime import date, datetime, timedelta
+from hashlib import sha256
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import func, select
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,6 +19,7 @@ from app.core.notifications import (
     notify_created,
 )
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.product import Product
 from app.models.schedule import BusinessSchedule, SlotConfig
 from app.schemas.appointment import (
     AppointmentCreate,
@@ -23,10 +27,35 @@ from app.schemas.appointment import (
     AppointmentStatusUpdate,
 )
 
+_ART = ZoneInfo("America/Argentina/Buenos_Aires")
+
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+
+
+def _slot_lock_key(slot_dt: datetime) -> int:
+    """63-bit advisory lock key derivado del slot datetime. Evita race conditions al reservar."""
+    return int(sha256(slot_dt.isoformat().encode()).hexdigest(), 16) & 0x7FFF_FFFF_FFFF_FFFF
 
 _ACTIVE = (AppointmentStatus.pending_confirmation, AppointmentStatus.confirmed)
 
+# ── Rate limiting in-memory (QA-RES-004) ─────────────────────────────────────
+# Sin dependencias externas: dict IP → lista de timestamps de los últimos 60s
+_rl_log: dict[str, list[datetime]] = defaultdict(list)
+_RL_MAX = 10          # máx solicitudes por ventana
+_RL_WINDOW_SEC = 60   # ventana de tiempo en segundos
+
+
+def _rate_ok(ip: str) -> bool:
+    now = datetime.now()
+    cutoff = now - timedelta(seconds=_RL_WINDOW_SEC)
+    _rl_log[ip] = [t for t in _rl_log[ip] if t > cutoff]
+    if len(_rl_log[ip]) >= _RL_MAX:
+        return False
+    _rl_log[ip].append(now)
+    return True
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _notif(apt: Appointment) -> AptNotif:
     return AptNotif(
@@ -82,7 +111,7 @@ async def cancel_by_token(
     if appointment.status == AppointmentStatus.cancelled:
         raise HTTPException(400, "El turno ya fue cancelado")
 
-    data = _notif(appointment)  # capturar antes de cambiar estado
+    data = _notif(appointment)
     appointment.status = AppointmentStatus.cancelled
     await db.commit()
 
@@ -94,13 +123,23 @@ async def cancel_by_token(
 
 @router.post("", response_model=AppointmentOut, status_code=201)
 async def create_appointment(
+    request: Request,
     data: AppointmentCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    slot_dt = data.slot_datetime.replace(tzinfo=None)
+    # QA-RES-004: rate limiting por IP
+    client_ip = (request.client.host if request.client else None) or "unknown"
+    if not _rate_ok(client_ip):
+        raise HTTPException(
+            429,
+            "Demasiadas solicitudes. Esperá unos minutos antes de intentar de nuevo.",
+        )
+
+    # Normalizar a naive local: strip timezone y sub-minuto
+    slot_dt = data.slot_datetime.replace(tzinfo=None, second=0, microsecond=0)
     target_date = slot_dt.date()
-    today = date.today()
+    today = datetime.now(_ART).date()
 
     if target_date < today:
         raise HTTPException(400, "No se puede reservar en el pasado")
@@ -127,6 +166,25 @@ async def create_appointment(
         raise HTTPException(400, "El horario está fuera del horario de atención")
     if (slot_dt + timedelta(minutes=config.slot_duration_minutes)).time() > schedule.close_time:
         raise HTTPException(400, "El horario está fuera del horario de atención")
+
+    # Validar que el slot_datetime cae exactamente en la grilla de turnos
+    open_dt = datetime.combine(target_date, schedule.open_time)
+    delta_secs = int((slot_dt - open_dt).total_seconds())
+    if delta_secs < 0 or delta_secs % (config.slot_duration_minutes * 60) != 0:
+        raise HTTPException(400, "El horario no corresponde a un turno válido")
+
+    # Validar que el product_id existe si se proveyó
+    if data.product_id is not None:
+        product = await db.get(Product, data.product_id)
+        if not product:
+            raise HTTPException(400, "Producto no encontrado")
+
+    # Lock exclusivo por slot: serializa requests concurrentes para el mismo horario.
+    # pg_advisory_xact_lock bloquea hasta adquirir el lock y lo libera al hacer commit/rollback.
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(:key)"),
+        {"key": _slot_lock_key(slot_dt)},
+    )
 
     existing = (
         await db.execute(
@@ -155,6 +213,21 @@ async def create_appointment(
     background_tasks.add_task(notify_created, notif_data, business_phone)
 
     return result
+
+
+# ── Admin: delete cancelled ───────────────────────────────────────────────────
+
+@router.delete(
+    "/cancelled",
+    status_code=204,
+    dependencies=[Depends(require_admin)],
+)
+async def delete_cancelled_appointments(db: AsyncSession = Depends(get_db)):
+    """Elimina definitivamente todos los turnos con estado cancelado."""
+    await db.execute(
+        delete(Appointment).where(Appointment.status == AppointmentStatus.cancelled)
+    )
+    await db.commit()
 
 
 # ── Admin: list ───────────────────────────────────────────────────────────────
@@ -196,6 +269,7 @@ async def update_status(
     if data.status == AppointmentStatus.confirmed:
         background_tasks.add_task(notify_confirmed_by_admin, notif_data)
     elif data.status == AppointmentStatus.cancelled:
-        background_tasks.add_task(notify_cancelled_by_admin, notif_data)
+        # QA-ADM-005: incluir motivo de cancelación en el email
+        background_tasks.add_task(notify_cancelled_by_admin, notif_data, data.cancel_reason)
 
     return await _load(appointment_id, db)

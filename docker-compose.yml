@@ -24,6 +24,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-apple}:${POSTGRES_PASSWORD:-apple123}@postgres:5432/${POSTGRES_DB:-sistemaapple}
+      TZ: America/Argentina/Buenos_Aires
     volumes:
       - ./backend:/app
       - media_data:/app/media

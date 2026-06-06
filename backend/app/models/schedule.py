@@ -1,6 +1,6 @@
 from datetime import time
 
-from sqlalchemy import Boolean, Integer, Time
+from sqlalchemy import Boolean, Integer, Numeric, String, Time
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -27,3 +27,5 @@ class SlotConfig(Base):
     slot_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     max_per_slot: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     max_advance_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    display_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="ARS")
+    usd_rate: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=1000.0)

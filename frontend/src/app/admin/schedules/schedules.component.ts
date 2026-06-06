@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  PLATFORM_ID,
   inject,
   signal,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 
@@ -39,6 +41,31 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
             <div class="h-16 rounded-2xl bg-gray-100 animate-pulse"></div>
           }
         </div>
+
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-2xl text-center">
+          <svg class="w-10 h-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-sm font-medium text-gray-500 mb-1">No se pudieron cargar los horarios</p>
+          <p class="text-xs text-gray-400 mb-5">Verificá que tenés sesión activa e intentá de nuevo.</p>
+          <button (click)="loadSchedules()"
+                  class="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-xl
+                         hover:bg-gray-800 transition-colors min-h-[44px]">
+            Reintentar
+          </button>
+        </div>
+
+      } @else if (schedules().length === 0) {
+        <div class="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-2xl text-center">
+          <p class="text-sm text-gray-400">Sin datos de horarios. Reintentá o recargá la página.</p>
+          <button (click)="loadSchedules()" class="mt-4 px-5 py-2.5 bg-black text-white text-sm
+                 font-medium rounded-xl hover:bg-gray-800 transition-colors min-h-[44px]">
+            Reintentar
+          </button>
+        </div>
+
       } @else {
         <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           @for (sch of schedules(); track sch.id; let last = $last) {
@@ -68,7 +95,7 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
 
               <!-- Horario -->
               @if (sch.is_active) {
-                <div class="flex items-center gap-2 flex-1">
+                <div class="flex items-center gap-2 flex-1 flex-wrap">
                   <div class="flex items-center gap-1.5">
                     <label [for]="'open_' + sch.id" class="text-xs text-gray-400 w-14">Apertura</label>
                     <input
@@ -92,7 +119,6 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
                   </div>
                 </div>
 
-                <!-- Save button -->
                 <button
                   type="button"
                   (click)="save(sch)"
@@ -131,17 +157,26 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
 })
 export class SchedulesComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly platform = inject(PLATFORM_ID);
 
   readonly schedules = signal<Schedule[]>([]);
   readonly loading = signal(true);
+  readonly loadError = signal(false);
   readonly saving = signal<number | null>(null);
   readonly successMsg = signal('');
   readonly errorMsg = signal('');
 
   ngOnInit(): void {
+    if (!isPlatformBrowser(this.platform)) return;
+    this.loadSchedules();
+  }
+
+  protected loadSchedules(): void {
+    this.loading.set(true);
+    this.loadError.set(false);
     this.http.get<Schedule[]>('/api/v1/schedules').subscribe({
       next: s => { this.schedules.set(s); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      error: () => { this.loading.set(false); this.loadError.set(true); },
     });
   }
 

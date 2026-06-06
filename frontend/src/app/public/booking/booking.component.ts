@@ -2,15 +2,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
-  PLATFORM_ID,
+  afterNextRender,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
-import { isPlatformBrowser } from '@angular/common';
-import { forkJoin } from 'rxjs';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { forkJoin, catchError, of } from 'rxjs';
 
 import {
   Appointment,
@@ -25,7 +24,7 @@ import { ProductService } from '../../core/product.service';
 @Component({
   selector: 'app-booking',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule],
+  imports: [ReactiveFormsModule, FormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-gray-50">
@@ -36,6 +35,27 @@ import { ProductService } from '../../core/product.service';
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-[0.2em] mb-2">Reservas</p>
           <h1 class="text-4xl font-semibold tracking-tight text-gray-900">Reservar turno</h1>
           <p class="mt-2 text-gray-400">Elegí el día y horario, y te esperamos en el local.</p>
+
+          <!-- QA-RES-002: indicador de cascada de pasos -->
+          <div class="flex items-center gap-1.5 mt-5 flex-wrap">
+            @for (step of steps; track step.label; let i = $index) {
+              <span class="flex items-center gap-1.5">
+                <span class="flex items-center gap-1.5 text-xs font-medium"
+                      [class]="step.done() ? 'text-gray-900' : 'text-gray-300'">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                        [class]="step.done() ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'">
+                    {{ i + 1 }}
+                  </span>
+                  {{ step.label }}
+                </span>
+                @if (i < steps.length - 1) {
+                  <svg class="w-3 h-3 text-gray-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                  </svg>
+                }
+              </span>
+            }
+          </div>
         </div>
 
         @if (loadingData()) {
@@ -43,6 +63,20 @@ import { ProductService } from '../../core/product.service';
             @for (_ of [1,2,3]; track $index) {
               <div class="h-32 rounded-2xl bg-gray-200 animate-pulse"></div>
             }
+          </div>
+        } @else if (loadingError()) {
+          <div class="flex flex-col items-center justify-center py-20 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-sm font-medium text-gray-500 mb-1">No se pudo cargar la disponibilidad</p>
+            <p class="text-xs text-gray-400 mb-5">Verificá tu conexión e intentá de nuevo.</p>
+            <button (click)="_loadData()"
+                    class="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-xl
+                           hover:bg-gray-800 transition-colors min-h-[44px]">
+              Reintentar
+            </button>
           </div>
         } @else {
 
@@ -103,7 +137,7 @@ import { ProductService } from '../../core/product.service';
 
               <!-- Calendar grid -->
               <div class="grid grid-cols-7 gap-1">
-                @for (day of calendarDays(); track day.date.toISOString()) {
+                @for (day of calendarDays(); track day.date.getTime()) {
                   <button
                     type="button"
                     [disabled]="day.disabled || !day.current"
@@ -163,15 +197,15 @@ import { ProductService } from '../../core/product.service';
 
                 <div>
                   <label for="guest_name" class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Nombre completo <span class="text-red-400">*</span>
+                    Nombre <span class="text-red-400">*</span>
                   </label>
                   <input id="guest_name" name="guest_name" formControlName="guest_name" type="text"
-                         autocomplete="name" placeholder="Juan García"
+                         autocomplete="name" placeholder="Juan García" maxlength="30"
                          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                 placeholder:text-gray-300
                                 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"/>
                   @if (form.get('guest_name')?.invalid && form.get('guest_name')?.touched) {
-                    <p class="mt-1.5 text-xs text-red-400">Campo requerido</p>
+                    <p class="mt-1.5 text-xs text-red-400">Nombre requerido (máx. 30 caracteres)</p>
                   }
                 </div>
 
@@ -180,7 +214,7 @@ import { ProductService } from '../../core/product.service';
                     Email <span class="text-red-400">*</span>
                   </label>
                   <input id="guest_email" name="guest_email" formControlName="guest_email" type="email"
-                         autocomplete="email" placeholder="juan@email.com"
+                         autocomplete="email" placeholder="juan@email.com" maxlength="254"
                          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                 placeholder:text-gray-300
                                 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"/>
@@ -194,22 +228,27 @@ import { ProductService } from '../../core/product.service';
                     Teléfono <span class="text-red-400">*</span>
                   </label>
                   <input id="guest_phone" name="guest_phone" formControlName="guest_phone" type="tel"
-                         autocomplete="tel" placeholder="+54 9 11 1234-5678"
+                         autocomplete="tel" placeholder="ej. 1112345678" maxlength="20"
+                         inputmode="numeric"
                          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                 placeholder:text-gray-300
                                 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"/>
                   @if (form.get('guest_phone')?.invalid && form.get('guest_phone')?.touched) {
-                    <p class="mt-1.5 text-xs text-red-400">Campo requerido</p>
+                    <p class="mt-1.5 text-xs text-red-400">
+                      Solo dígitos, entre 7 y 20 números
+                    </p>
                   }
                 </div>
 
                 <div>
-                  <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">Notas</label>
-                  <textarea id="notes" name="notes" formControlName="notes" rows="2"
-                            placeholder="Algún detalle que quieras contarnos…"
-                            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
-                                   placeholder:text-gray-300 resize-none
-                                   focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"></textarea>
+                  <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Notas <span class="text-gray-400 font-normal">(opcional, máx. 30 caracteres)</span>
+                  </label>
+                  <input id="notes" name="notes" formControlName="notes" type="text" maxlength="30"
+                         placeholder="ej. Prefiero turno a la tarde"
+                         class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
+                                placeholder:text-gray-300
+                                focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"/>
                 </div>
 
                 <!-- Validation hint -->
@@ -238,6 +277,14 @@ import { ProductService } from '../../core/product.service';
           </div>
         }
 
+        <!-- Pie: acceso a turno existente -->
+        <div class="mt-12 pt-6 border-t border-gray-200 text-center">
+          <a routerLink="/turnos/cancelar"
+             class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            ¿Ya tenés un turno? Ver o cancelar →
+          </a>
+        </div>
+
       </div>
     </div>
   `,
@@ -247,7 +294,6 @@ export class BookingComponent implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly platform = inject(PLATFORM_ID);
   private readonly fb = inject(FormBuilder);
 
   readonly products = signal<Product[]>([]);
@@ -266,13 +312,22 @@ export class BookingComponent implements OnInit {
   readonly submitting = signal(false);
   readonly apiError = signal('');
   readonly showMissingHint = signal(false);
+  readonly loadingError = signal(false);
 
   readonly form = this.fb.group({
-    guest_name: ['', Validators.required],
+    guest_name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(30)]],
     guest_email: ['', [Validators.required, Validators.email]],
-    guest_phone: ['', Validators.required],
-    notes: [''],
+    guest_phone: ['', [Validators.required, Validators.pattern(/^\d{7,20}$/)]],
+    notes: ['', Validators.maxLength(30)],
   });
+
+  // QA-RES-002: indicador de cascada de pasos
+  readonly steps = [
+    { label: 'Producto', done: computed(() => this.selectedProductId() !== null) },
+    { label: 'Fecha', done: computed(() => this.selectedDate() !== null) },
+    { label: 'Horario', done: computed(() => this.selectedSlot() !== null) },
+    { label: 'Datos', done: computed(() => this.form.valid) },
+  ];
 
   // ── Calendar computed ─────────────────────────────────────────────────────
 
@@ -299,6 +354,10 @@ export class BookingComponent implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Pre-computar maxDate y Set de días activos una sola vez para toda la grilla
+    const maxDate = new Date(today.getTime() + (sch?.config.max_advance_days ?? 0) * 86_400_000);
+    const activeDows = new Set((sch?.schedules ?? []).filter(s => s.is_active).map(s => s.day_of_week));
+
     const firstDay = new Date(year, m, 1);
     const lastDay = new Date(year, m + 1, 0);
     const startPad = (firstDay.getDay() + 6) % 7; // Mon=0
@@ -314,7 +373,7 @@ export class BookingComponent implements OnInit {
       days.push({
         date,
         current: true,
-        disabled: this._isDisabled(date, today, sch),
+        disabled: this._isDisabled(date, today, maxDate, activeDows),
         today: date.getTime() === today.getTime(),
       });
     }
@@ -329,25 +388,47 @@ export class BookingComponent implements OnInit {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  ngOnInit(): void {
-    if (!isPlatformBrowser(this.platform)) {
-      this.loadingData.set(false);
-      return;
-    }
+  constructor() {
+    // afterNextRender garantiza que los HTTP calls sólo corran en el browser,
+    // evitando problemas de SSR con URLs relativas y localStorage.
+    afterNextRender(() => this._loadData());
+  }
 
+  ngOnInit(): void {
     const productParam = this.route.snapshot.queryParamMap.get('product');
     if (productParam) this.selectedProductId.set(parseInt(productParam, 10));
+  }
+
+  protected _loadData(): void {
+    this.loadingData.set(true);
+    this.loadingError.set(false);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = this._toDateISO(today);
 
     forkJoin({
       products: this.productService.list(),
       schedule: this.appointmentService.getSchedule(),
+      todaySlots: this.appointmentService.getSlots(todayISO).pipe(catchError(() => of<Slot[]>([]))),
     }).subscribe({
-      next: ({ products, schedule }) => {
+      next: ({ products, schedule, todaySlots }) => {
         this.products.set(products);
         this.schedule.set(schedule);
+
+        const maxDate = new Date(today.getTime() + schedule.config.max_advance_days * 86_400_000);
+        const activeDows = new Set(schedule.schedules.filter(s => s.is_active).map(s => s.day_of_week));
+        if (todaySlots.length > 0 && !this._isDisabled(today, today, maxDate, activeDows)) {
+          this.selectedDate.set(today);
+          this.slots.set(todaySlots);
+        }
+
         this.loadingData.set(false);
       },
-      error: () => this.loadingData.set(false),
+      error: () => {
+        this.loadingData.set(false);
+        this.loadingError.set(true);
+      },
     });
   }
 
@@ -449,16 +530,9 @@ export class BookingComponent implements OnInit {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
-  private _isDisabled(date: Date, today: Date, sch: BusinessInfo | null): boolean {
+  private _isDisabled(date: Date, today: Date, maxDate: Date, activeDows: Set<number>): boolean {
     if (date < today) return true;
-    if (!sch) return true;
-
-    const maxDate = new Date(today);
-    maxDate.setDate(today.getDate() + sch.config.max_advance_days);
     if (date > maxDate) return true;
-
-    const pyDow = (date.getDay() + 6) % 7; // Mon=0 … Sun=6
-    const daySch = sch.schedules.find(s => s.day_of_week === pyDow);
-    return !daySch?.is_active;
+    return !activeDows.has((date.getDay() + 6) % 7); // Mon=0 … Sun=6
   }
 }

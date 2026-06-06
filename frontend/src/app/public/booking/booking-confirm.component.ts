@@ -1,5 +1,11 @@
-import { ChangeDetectionStrategy, Component, PLATFORM_ID, inject, signal } from '@angular/core';
-import { RouterLink, Router } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  PLATFORM_ID,
+  inject,
+  signal,
+} from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 
 import { Appointment } from '../../core/appointment.models';
@@ -11,8 +17,9 @@ import { Appointment } from '../../core/appointment.models';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-16">
-      <div class="w-full max-w-sm">
+      <div class="w-full max-w-sm space-y-4">
 
+        <!-- ── Tarjeta principal ─────────────────────────────────────── -->
         <div class="bg-white rounded-3xl border border-gray-100 p-8 text-center">
 
           <!-- Checkmark -->
@@ -25,9 +32,10 @@ import { Appointment } from '../../core/appointment.models';
 
           <h1 class="text-xl font-semibold text-gray-900">¡Turno reservado!</h1>
           <p class="mt-2 text-sm text-gray-400 leading-relaxed">
-            Recibirás un email de confirmación con todos los detalles y el link para cancelar si lo necesitás.
+            Preparate para tu visita. Te enviamos los detalles por email.
           </p>
 
+          <!-- Resumen del turno -->
           @if (appointment(); as apt) {
             <div class="mt-6 bg-gray-50 rounded-2xl p-4 text-left space-y-2.5">
               <div class="flex justify-between text-sm">
@@ -49,16 +57,69 @@ import { Appointment } from '../../core/appointment.models';
                 </div>
               }
             </div>
+
+            <!-- CTA principal -->
+            <a routerLink="/catalogo"
+               class="block mt-6 py-3 rounded-xl bg-black text-white text-sm font-medium
+                      hover:bg-gray-800 transition-colors min-h-[48px] flex items-center justify-center">
+              Volver al catálogo
+            </a>
+
+            <!-- Link de cancelación (discreto) -->
+            <a [routerLink]="['/turnos/cancelar', apt.management_token]"
+               class="block mt-3 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              ¿Necesitás cancelar el turno?
+            </a>
+
+          } @else {
+            <!-- Sin estado (el usuario recargó la página) -->
+            <p class="mt-4 text-sm text-gray-400 leading-relaxed">
+              Los detalles y el link para cancelar están en el email de confirmación.
+            </p>
+
+            <a routerLink="/catalogo"
+               class="block mt-6 py-3 rounded-xl bg-black text-white text-sm font-medium
+                      hover:bg-gray-800 transition-colors min-h-[48px] flex items-center justify-center">
+              Volver al catálogo
+            </a>
+
+            <a routerLink="/turnos/cancelar"
+               class="block mt-3 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              Tengo el código de mi turno →
+            </a>
           }
-
-          <a routerLink="/catalogo"
-             class="block mt-6 py-2.5 rounded-xl border border-gray-200
-                    text-sm font-medium text-gray-600
-                    hover:bg-gray-50 transition-colors min-h-[44px] flex items-center justify-center">
-            Volver al catálogo
-          </a>
-
         </div>
+
+        <!-- ── Tarjeta de código (sólo si tenemos el turno) ──────────── -->
+        @if (appointment(); as apt) {
+          <div class="bg-white rounded-3xl border border-gray-100 px-6 py-5">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Código de turno
+            </p>
+            <p class="text-xs text-gray-400 mb-3 leading-relaxed">
+              Guardalo. Si perdés el email de confirmación podés usarlo para cancelar tu turno en
+              <span class="font-medium text-gray-500">/turnos/cancelar</span>.
+            </p>
+
+            <div class="flex items-center gap-2">
+              <code class="flex-1 font-mono text-xs text-gray-700 bg-gray-50 border border-gray-200
+                           rounded-xl px-3 py-2.5 break-all leading-relaxed select-all">
+                {{ apt.management_token }}
+              </code>
+              <button
+                type="button"
+                (click)="copyToken(apt.management_token)"
+                class="shrink-0 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all min-h-[40px]"
+                [class]="copied()
+                  ? 'border-green-200 bg-green-50 text-green-600'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'"
+              >
+                {{ copied() ? '✓ Copiado' : 'Copiar' }}
+              </button>
+            </div>
+          </div>
+        }
+
       </div>
     </div>
   `,
@@ -67,6 +128,7 @@ export class BookingConfirmComponent {
   private readonly platform = inject(PLATFORM_ID);
 
   readonly appointment = signal<Appointment | null>(null);
+  readonly copied = signal(false);
 
   constructor() {
     if (isPlatformBrowser(this.platform)) {
@@ -75,6 +137,29 @@ export class BookingConfirmComponent {
         this.appointment.set(state.appointment);
       }
     }
+  }
+
+  copyToken(token: string): void {
+    const done = () => {
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 2000);
+    };
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(token).then(done).catch(() => this._fallbackCopy(token, done));
+    } else {
+      this._fallbackCopy(token, done);
+    }
+  }
+
+  private _fallbackCopy(text: string, callback: () => void): void {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+    document.body.appendChild(el);
+    el.select();
+    try { document.execCommand('copy'); callback(); } catch { /* silent */ }
+    document.body.removeChild(el);
   }
 
   formatDate(dt: string): string {

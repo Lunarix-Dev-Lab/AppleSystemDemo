@@ -53,6 +53,12 @@ import { THEME } from '../../../theme.config';
           </a>
         </div>
 
+        <!-- Gestionar turno existente -->
+        <a routerLink="/turnos/cancelar"
+           class="mt-4 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+          ¿Ya tenés un turno? Cancelar o ver detalles →
+        </a>
+
         <!-- WhatsApp -->
         @if (whatsapp) {
           <a [href]="'https://wa.me/' + whatsapp"

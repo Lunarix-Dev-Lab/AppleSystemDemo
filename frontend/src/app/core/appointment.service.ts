@@ -39,7 +39,13 @@ export class AppointmentService {
     return this.http.get<Appointment[]>(`/api/v1/appointments${qs}`);
   }
 
-  updateStatus(id: number, status: AppointmentStatus): Observable<Appointment> {
-    return this.http.put<Appointment>(`/api/v1/appointments/${id}/status`, { status });
+  updateStatus(id: number, status: AppointmentStatus, cancelReason?: string): Observable<Appointment> {
+    const body: Record<string, unknown> = { status };
+    if (cancelReason) body['cancel_reason'] = cancelReason;
+    return this.http.put<Appointment>(`/api/v1/appointments/${id}/status`, body);
+  }
+
+  deleteCancelled(): Observable<void> {
+    return this.http.delete<void>('/api/v1/appointments/cancelled');
   }
 }

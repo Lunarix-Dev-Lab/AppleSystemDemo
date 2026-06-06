@@ -1,5 +1,6 @@
 from collections import Counter
 from datetime import date as date_t, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -13,6 +14,17 @@ from app.schemas.appointment import BusinessInfoOut, SlotOut
 router = APIRouter(prefix="/slots", tags=["slots"])
 
 _ACTIVE = (AppointmentStatus.pending_confirmation, AppointmentStatus.confirmed)
+_ART = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def _local_now() -> datetime:
+    """Hora actual en Argentina, como datetime naive (compatible con slot_times)."""
+    return datetime.now(_ART).replace(tzinfo=None)
+
+
+def _local_today() -> date_t:
+    """Fecha de hoy en Argentina."""
+    return datetime.now(_ART).date()
 
 
 @router.get("/schedule", response_model=BusinessInfoOut)
@@ -37,6 +49,8 @@ async def get_schedule(db: AsyncSession = Depends(get_db)):
             "slot_duration_minutes": config.slot_duration_minutes,
             "max_per_slot": config.max_per_slot,
             "max_advance_days": config.max_advance_days,
+            "display_currency": config.display_currency,
+            "usd_rate": float(config.usd_rate),
         },
     }
 
@@ -51,10 +65,9 @@ async def get_slots(
     except ValueError:
         raise HTTPException(400, "Formato de fecha inválido. Use YYYY-MM-DD")
 
-    if target < date_t.today():
+    if target < _local_today():
         return []
 
-    # Schedule for this weekday (Python: Mon=0 … Sun=6)
     dow = target.weekday()
     schedule = (
         await db.execute(
@@ -68,19 +81,28 @@ async def get_slots(
 
     config = (await db.execute(select(SlotConfig).limit(1))).scalar_one()
 
-    # Generate slot datetimes
+    # QA-ADM-010: si close_time es 00:00, tratarlo como medianoche del día siguiente
+    if schedule.close_time == time(0, 0):
+        end = datetime.combine(target + timedelta(days=1), time(0, 0))
+    else:
+        end = datetime.combine(target, schedule.close_time)
+
     duration = timedelta(minutes=config.slot_duration_minutes)
     slot_times: list[datetime] = []
     cur = datetime.combine(target, schedule.open_time)
-    end = datetime.combine(target, schedule.close_time)
     while cur + duration <= end:
         slot_times.append(cur)
         cur += duration
 
+    # QA-RES-005: para el día de hoy, descartar slots que ya pasaron
+    # (con 5 min de gracia para no rechazar el slot actual)
+    if target == _local_today():
+        cutoff = _local_now() + timedelta(minutes=5)
+        slot_times = [s for s in slot_times if s > cutoff]
+
     if not slot_times:
         return []
 
-    # Count booked slots for this date (naive comparison)
     day_start = datetime.combine(target, time.min)
     day_end = datetime.combine(target, time.max)
     booked_dts = (
@@ -91,7 +113,6 @@ async def get_slots(
         )
     ).scalars().all()
 
-    # Strip tz for comparison
     counts: Counter = Counter(
         dt.replace(tzinfo=None) if getattr(dt, "tzinfo", None) else dt
         for dt in booked_dts

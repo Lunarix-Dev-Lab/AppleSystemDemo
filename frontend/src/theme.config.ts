@@ -63,6 +63,13 @@ export const THEME = {
 
     /** Locale para formatear precios y fechas */
     locale: 'es-AR',
+
+    /**
+     * Tipo de cambio para el selector ARS/USD en el catálogo.
+     * Actualizar manualmente cuando cambie la cotización.
+     * Ejemplo: 1000 → USD 1 = ARS 1.000
+     */
+    usdRate: 1000,
   },
 
   // ── Acceso a la demo ─────────────────────────────────────────────────────

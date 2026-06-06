@@ -14,6 +14,8 @@ export interface Product {
   storage_options: string[];
   stock: number;
   is_active: boolean;
+  is_sealed: boolean;
+  battery_health: number | null;
   created_at: string;
   updated_at: string;
   images: ProductImage[];
@@ -27,6 +29,8 @@ export interface ProductCreate {
   storage_options: string[];
   stock: number;
   is_active: boolean;
+  is_sealed: boolean;
+  battery_health: number | null;
 }
 
 export type ProductUpdate = Partial<ProductCreate>;

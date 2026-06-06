@@ -18,6 +18,7 @@ class AppointmentStatus(str, enum.Enum):
     confirmed = "confirmed"
     cancelled = "cancelled"
     rescheduled = "rescheduled"
+    realizado = "realizado"
 
 
 def _utcnow() -> datetime:

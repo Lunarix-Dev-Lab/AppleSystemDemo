@@ -1,7 +1,8 @@
 from datetime import time as time_type
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,9 +80,11 @@ config_router = APIRouter(prefix="/config", tags=["config"])
 
 
 class SlotConfigUpdate(BaseModel):
-    slot_duration_minutes: int
-    max_per_slot: int
-    max_advance_days: int
+    slot_duration_minutes: int = Field(ge=15, le=240)
+    max_per_slot: int = Field(ge=1, le=50)
+    max_advance_days: int = Field(ge=1, le=365)
+    display_currency: Literal['ARS', 'USD'] = 'ARS'
+    usd_rate: float = Field(default=1000.0, ge=1, le=9_999_999)
 
 
 @config_router.get("", dependencies=[Depends(require_admin)])
@@ -94,6 +97,8 @@ async def get_config(db: AsyncSession = Depends(get_db)) -> dict:
         "slot_duration_minutes": config.slot_duration_minutes,
         "max_per_slot": config.max_per_slot,
         "max_advance_days": config.max_advance_days,
+        "display_currency": config.display_currency,
+        "usd_rate": float(config.usd_rate),
     }
 
 
@@ -113,10 +118,14 @@ async def update_config(data: SlotConfigUpdate, db: AsyncSession = Depends(get_d
     config.slot_duration_minutes = data.slot_duration_minutes
     config.max_per_slot = data.max_per_slot
     config.max_advance_days = data.max_advance_days
+    config.display_currency = data.display_currency
+    config.usd_rate = data.usd_rate
     await db.commit()
     return {
         "id": config.id,
         "slot_duration_minutes": config.slot_duration_minutes,
         "max_per_slot": config.max_per_slot,
         "max_advance_days": config.max_advance_days,
+        "display_currency": config.display_currency,
+        "usd_rate": float(config.usd_rate),
     }

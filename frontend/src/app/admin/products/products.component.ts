@@ -2,11 +2,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  PLATFORM_ID,
   inject,
   signal,
 } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { isPlatformBrowser } from '@angular/common';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { firstValueFrom, forkJoin } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 
 import { Product, ProductImage } from '../../core/product.models';
 import { ProductService } from '../../core/product.service';
@@ -69,7 +72,7 @@ import { ProductService } from '../../core/product.service';
               @for (product of products(); track product.id) {
                 <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
 
-                  <!-- Thumbnail + nombre -->
+                  <!-- Thumbnail + nombre + condición -->
                   <td class="px-5 py-3.5">
                     <div class="flex items-center gap-3">
                       <div class="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
@@ -83,7 +86,14 @@ import { ProductService } from '../../core/product.service';
                           </svg>
                         }
                       </div>
-                      <span class="text-sm font-medium text-gray-900">{{ product.name }}</span>
+                      <div>
+                        <p class="text-sm font-medium text-gray-900">{{ product.name }}</p>
+                        @if (product.is_sealed) {
+                          <p class="text-xs text-gray-400 mt-0.5">Sellado</p>
+                        } @else if (product.battery_health) {
+                          <p class="text-xs text-green-500 mt-0.5">{{ product.battery_health }}% bat.</p>
+                        }
+                      </div>
                     </div>
                   </td>
 
@@ -213,29 +223,91 @@ import { ProductService } from '../../core/product.service';
                                transition"></textarea>
             </div>
 
+            <!-- Condición: Sellado / Usado -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Condición</label>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  (click)="setSealed(true)"
+                  class="flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all min-h-[44px]"
+                  [class]="form.controls.is_sealed.value
+                    ? 'border-black bg-black text-white'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'">
+                  Sellado
+                </button>
+                <button
+                  type="button"
+                  (click)="setSealed(false)"
+                  class="flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all min-h-[44px]"
+                  [class]="!form.controls.is_sealed.value
+                    ? 'border-black bg-black text-white'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'">
+                  Usado
+                </button>
+              </div>
+            </div>
+
+            <!-- Estado de batería (solo si es usado) -->
+            @if (!form.controls.is_sealed.value) {
+              <div>
+                <label for="prod-battery" class="block text-sm font-medium text-gray-700 mb-1.5">
+                  Estado de batería <span class="text-red-400">*</span>
+                </label>
+                <div class="flex items-center gap-3">
+                  <input
+                    id="prod-battery"
+                    name="battery_health"
+                    formControlName="battery_health"
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="ej. 87"
+                    (keydown)="$event.key === '.' || $event.key === ',' ? $event.preventDefault() : null"
+                    class="w-28 px-4 py-2.5 rounded-xl border border-gray-200 text-sm
+                           placeholder:text-gray-300
+                           focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
+                           transition"
+                  />
+                  <span class="text-sm text-gray-500">%</span>
+                </div>
+                @if (form.hasError('batteryRequired') && form.controls.battery_health.touched) {
+                  <p class="mt-1.5 text-xs text-red-400">Ingresá el porcentaje de batería</p>
+                } @else if (form.controls.battery_health.invalid && form.controls.battery_health.touched) {
+                  <p class="mt-1.5 text-xs text-red-400">Porcentaje inválido (1–100)</p>
+                }
+              </div>
+            }
+
             <!-- Precio + Stock -->
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label for="prod-price" class="block text-sm font-medium text-gray-700 mb-1.5">
-                  Precio (ARS) <span class="text-red-400">*</span>
+                  Precio (USD) <span class="text-red-400">*</span>
                 </label>
-                <input id="prod-price" name="price" formControlName="price" type="number" min="0"
-                       placeholder="0"
+                <input id="prod-price" name="price" formControlName="price" type="number" min="0" max="99999999"
+                       placeholder="ej. 900"
                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                               placeholder:text-gray-300
                               focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
                               transition"/>
+                @if (form.get('price')?.invalid && form.get('price')?.touched) {
+                  <p class="mt-1.5 text-xs text-red-400">Precio inválido (0 – 99,999,999)</p>
+                }
               </div>
               <div>
                 <label for="prod-stock" class="block text-sm font-medium text-gray-700 mb-1.5">
                   Stock <span class="text-red-400">*</span>
                 </label>
-                <input id="prod-stock" name="stock" formControlName="stock" type="number" min="0"
+                <input id="prod-stock" name="stock" formControlName="stock" type="number" min="0" max="99999"
                        placeholder="0"
                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                               placeholder:text-gray-300
                               focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
                               transition"/>
+                @if (form.get('stock')?.invalid && form.get('stock')?.touched) {
+                  <p class="mt-1.5 text-xs text-red-400">Stock inválido (0 – 99,999)</p>
+                }
               </div>
             </div>
 
@@ -301,6 +373,17 @@ import { ProductService } from '../../core/product.service';
                 {{ form.get('is_active')!.value ? 'Activo (visible en vitrina)' : 'Inactivo (oculto)' }}
               </label>
             </div>
+
+            <!-- Toast de éxito -->
+            @if (savedMsg()) {
+              <div class="flex items-center gap-2 text-sm text-green-600
+                          bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+                Cambios guardados correctamente.
+              </div>
+            }
 
             <!-- Botones -->
             <div class="flex gap-3 pt-2">
@@ -377,11 +460,15 @@ import { ProductService } from '../../core/product.service';
 })
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
+  private readonly http = inject(HttpClient);
   private readonly fb = inject(FormBuilder);
+  private readonly platform = inject(PLATFORM_ID);
 
   readonly products = signal<Product[]>([]);
+  readonly usdRate = signal(1000);
   readonly loading = signal(true);
   readonly saving = signal(false);
+  readonly savedMsg = signal(false);
   readonly deleting = signal<number | null>(null);
   readonly showModal = signal(false);
   readonly editing = signal<Product | null>(null);
@@ -394,18 +481,45 @@ export class ProductsComponent implements OnInit {
   readonly storageInput = signal('');
 
   readonly form = this.fb.group({
-    name: ['', Validators.required],
-    description: [''],
-    price: [0, [Validators.required, Validators.min(0)]],
-    stock: [0, [Validators.required, Validators.min(0)]],
+    name: ['', [Validators.required, Validators.maxLength(200)]],
+    description: ['', Validators.maxLength(2000)],
+    price: [null as number | null, [Validators.required, Validators.min(0), Validators.max(99_999_999)]],
+    stock: [0, [Validators.required, Validators.min(0), Validators.max(99_999)]],
     is_active: [true],
+    is_sealed: [false],
+    battery_health: [null as number | null, [Validators.min(1), Validators.max(100)]],
+  }, {
+    validators: (group: AbstractControl) => {
+      if (!group.get('is_sealed')?.value && !group.get('battery_health')?.value) {
+        return { batteryRequired: true };
+      }
+      return null;
+    },
   });
 
   ngOnInit(): void {
-    this.productService.list(false).subscribe({
-      next: p => { this.products.set(p); this.loading.set(false); },
+    if (!isPlatformBrowser(this.platform)) return;
+    forkJoin({
+      products: this.productService.list(false),
+      config: this.http.get<{ usd_rate: number }>('/api/v1/config'),
+    }).subscribe({
+      next: ({ products, config }) => {
+        this.products.set(products);
+        this.usdRate.set(Number(config.usd_rate));
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
+  }
+
+  private _showSaved(): void {
+    this.savedMsg.set(true);
+    setTimeout(() => this.savedMsg.set(false), 3000);
+  }
+
+  setSealed(sealed: boolean): void {
+    this.form.controls.is_sealed.setValue(sealed);
+    if (sealed) this.form.controls.battery_health.setValue(null);
   }
 
   openCreate(): void {
@@ -414,7 +528,15 @@ export class ProductsComponent implements OnInit {
     this.formStorages.set([]);
     this.colorInput.set('');
     this.storageInput.set('');
-    this.form.reset({ name: '', description: '', price: 0, stock: 0, is_active: true });
+    this.form.reset({
+      name: '',
+      description: '',
+      price: null as number | null,
+      stock: 0,
+      is_active: true,
+      is_sealed: false,
+      battery_health: null as number | null,
+    });
     this.showModal.set(true);
   }
 
@@ -427,9 +549,11 @@ export class ProductsComponent implements OnInit {
     this.form.patchValue({
       name: product.name,
       description: product.description ?? '',
-      price: product.price,
+      price: Math.round(product.price / this.usdRate()),
       stock: product.stock,
       is_active: product.is_active,
+      is_sealed: product.is_sealed,
+      battery_health: product.battery_health,
     });
     this.showModal.set(true);
   }
@@ -440,16 +564,22 @@ export class ProductsComponent implements OnInit {
   }
 
   save(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      // Marcar battery_health como touched para mostrar el error
+      this.form.controls.battery_health.markAsTouched();
+      return;
+    }
     const raw = this.form.getRawValue();
     const payload = {
       name: raw.name!,
       description: raw.description || null,
-      price: raw.price!,
+      price: Math.round(raw.price! * this.usdRate()),
       stock: raw.stock!,
       is_active: raw.is_active!,
       colors: this.formColors(),
       storage_options: this.formStorages(),
+      is_sealed: raw.is_sealed ?? false,
+      battery_health: raw.is_sealed ? null : raw.battery_health,
     };
 
     this.saving.set(true);
@@ -462,7 +592,6 @@ export class ProductsComponent implements OnInit {
     obs.subscribe({
       next: updated => {
         if (current) {
-          // Preserve images when editing (server returns fresh images)
           this.editing.set({ ...updated, images: updated.images });
           this.products.update(list => list.map(p => p.id === updated.id ? updated : p));
         } else {
@@ -470,6 +599,7 @@ export class ProductsComponent implements OnInit {
           this.closeModal();
         }
         this.saving.set(false);
+        this._showSaved();
       },
       error: () => this.saving.set(false),
     });
@@ -490,7 +620,6 @@ export class ProductsComponent implements OnInit {
   toggleActive(product: Product): void {
     this.productService.update(product.id, { is_active: !product.is_active }).subscribe(updated => {
       this.products.update(list => list.map(p => p.id === updated.id ? updated : p));
-      // Update modal if open
       const current = this.editing();
       if (current?.id === updated.id) this.editing.set({ ...current, is_active: updated.is_active });
     });
@@ -573,6 +702,7 @@ export class ProductsComponent implements OnInit {
   }
 
   formatPrice(price: number): string {
-    return `$${Number(price).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    const usd = Math.round(Number(price) / this.usdRate());
+    return `USD ${usd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
   }
 }

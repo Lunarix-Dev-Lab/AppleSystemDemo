@@ -2,7 +2,8 @@ export type AppointmentStatus =
   | 'pending_confirmation'
   | 'confirmed'
   | 'cancelled'
-  | 'rescheduled';
+  | 'rescheduled'
+  | 'realizado';
 
 export interface ProductMinimal {
   id: number;
@@ -51,6 +52,8 @@ export interface SlotConfig {
   slot_duration_minutes: number;
   max_per_slot: number;
   max_advance_days: number;
+  display_currency: 'ARS' | 'USD';
+  usd_rate: number;
 }
 
 export interface BusinessInfo {

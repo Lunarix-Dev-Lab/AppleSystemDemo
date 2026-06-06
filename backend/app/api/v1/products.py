@@ -75,8 +75,15 @@ async def update_product(
     product_id: int, data: ProductUpdate, db: AsyncSession = Depends(get_db)
 ):
     product = await _get_or_404(product_id, db)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updated = data.model_dump(exclude_unset=True)
+    for field, value in updated.items():
         setattr(product, field, value)
+    # Solo validar consistencia si se tocó algún campo de condición
+    if "is_sealed" in updated or "battery_health" in updated:
+        if product.is_sealed:
+            product.battery_health = None
+        elif product.battery_health is None:
+            raise HTTPException(400, "Un producto usado debe tener porcentaje de batería.")
     await db.commit()
     return await _get_or_404(product_id, db)
 

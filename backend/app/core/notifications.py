@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from email.message import EmailMessage
+from html import escape as _esc
 
 import aiosmtplib
 
@@ -56,7 +57,7 @@ def _build_html(
     footer: str = "",
 ) -> str:
     detail_rows = "".join(
-        f'<tr><td class="dl">{l}</td><td class="dv">{v}</td></tr>'
+        f'<tr><td class="dl">{l}</td><td class="dv">{_esc(str(v))}</td></tr>'
         for l, v in rows
     )
     cta = (
@@ -86,7 +87,7 @@ tr:last-child td{{border-bottom:none}}
 </style></head><body>
 <div class="w"><div class="c">
 <div class="h"><div class="badge">{badge}</div><div class="title">{title}</div></div>
-<div class="b"><p class="gr">{greeting}</p><table>{detail_rows}</table></div>
+<div class="b"><p class="gr">{_esc(greeting)}</p><table>{detail_rows}</table></div>
 {cta}
 <div class="footer">{footer}</div>
 </div></div></body></html>"""
@@ -201,8 +202,8 @@ async def notify_cancelled(apt: AptNotif) -> None:
     await _send_email(apt.guest_email, "Turno cancelado", html)
 
 
-async def notify_cancelled_by_admin(apt: AptNotif) -> None:
-    """Admin canceló el turno del cliente."""
+async def notify_cancelled_by_admin(apt: AptNotif, reason: str | None = None) -> None:
+    """Admin canceló el turno del cliente (QA-ADM-005: incluir motivo si se provee)."""
     cfg = get_settings()
     date_str, time_str = _fmt(apt.slot_datetime)
 
@@ -210,13 +211,18 @@ async def notify_cancelled_by_admin(apt: AptNotif) -> None:
     if apt.product_name:
         rows.append(("Producto", apt.product_name))
 
+    if reason:
+        rows.append(("Motivo", reason))
+
+    greeting = (
+        f"Hola {apt.guest_name}, lamentamos informarte que el local tuvo que cancelar tu turno. "
+        f"Podés reservar uno nuevo cuando quieras."
+    )
+
     html = _build_html(
         badge="Turno cancelado",
         title="Tu turno fue cancelado por el local",
-        greeting=(
-            f"Hola {apt.guest_name}, lamentamos informarte que el local tuvo que cancelar tu turno. "
-            f"Podés reservar uno nuevo cuando quieras."
-        ),
+        greeting=greeting,
         rows=rows,
         cta_label="Reservar nuevo turno",
         cta_url=f"{cfg.FRONTEND_URL}/reservar",
