@@ -47,3 +47,5 @@ Thumbs.db
 # ── Docker ────────────────────────────────────────────────────────────────────
 # (docker-compose.yml SÍ se sube, solo ignoramos overrides locales)
 docker-compose.override.yml
+build-artifacts/frontend-latest.tar
+build-artifacts/backend-latest.tar

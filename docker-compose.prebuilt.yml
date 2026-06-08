@@ -1,0 +1,58 @@
+# Docker Compose for Production VPS Deployment
+# Uses pre-built images (loaded from tar files) - NO BUILD HAPPENS HERE
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sistemaapple}
+      POSTGRES_USER: ${POSTGRES_USER:-apple}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apple} -d ${POSTGRES_DB:-sistemaapple}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: applesystem-backend:${IMAGE_TAG:-latest}
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-apple}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sistemaapple}
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  frontend:
+    image: applesystem-frontend:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      PORT: 4000
+      API_URL: http://backend:8000
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
+  media_data:
