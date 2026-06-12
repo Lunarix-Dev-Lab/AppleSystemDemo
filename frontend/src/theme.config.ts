@@ -79,7 +79,35 @@ export const THEME = {
    * Con valor → se muestra pantalla de acceso antes de cualquier página.
    */
   gate: {
-    password: 'lunarix2025',
+    password: '',
+  },
+
+  // ── Analítica ────────────────────────────────────────────────────────────
+  /**
+   * Google Analytics 4. Pegá tu ID de medición (formato 'G-XXXXXXXXXX').
+   * Vacío ('') → no se carga ningún script de analítica.
+   *
+   * IMPORTANTE: GA solo se activa DESPUÉS de que el visitante acepta las
+   * cookies en el banner. Si rechaza, no se carga nada. (Ver ConsentService.)
+   */
+  analytics: {
+    googleAnalyticsId: 'G-T8NF7T9FJC',
+  },
+
+  // ── Datos legales (Términos, Privacidad, Cookies) ────────────────────────
+  /**
+   * Completá estos datos con la información real del negocio.
+   * Aparecen en las páginas legales. Recomendamos que un abogado las revise.
+   */
+  legal: {
+    /** Razón social o nombre legal del responsable. */
+    companyName: 'SistemaApple',
+    /** CUIT del responsable (opcional, recomendado). */
+    cuit: '',
+    /** Jurisdicción para resolución de conflictos. */
+    jurisdiction: 'la Ciudad Autónoma de Buenos Aires',
+    /** Fecha de última actualización de los textos legales. */
+    lastUpdated: 'Junio de 2026',
   },
 
   // ── Colores del tema ─────────────────────────────────────────────────────

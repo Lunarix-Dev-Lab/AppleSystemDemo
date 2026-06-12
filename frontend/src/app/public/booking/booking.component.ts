@@ -84,25 +84,33 @@ import { ProductService } from '../../core/product.service';
 
             <!-- Producto (opcional) -->
             <section class="bg-white rounded-2xl border border-gray-100 p-6">
-              <label class="block text-sm font-semibold text-gray-700 mb-3">
+              <label for="product_id" class="block text-sm font-semibold text-gray-700 mb-1">
                 Producto de interés
                 <span class="ml-1 text-xs font-normal text-gray-400">(opcional)</span>
               </label>
-              <select
-                id="product_id"
-                [ngModel]="selectedProductId()"
-                (ngModelChange)="selectedProductId.set($event)"
-                name="product_id"
-                class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
-                       text-gray-700 bg-white
-                       focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
-                       transition appearance-none"
-              >
-                <option [ngValue]="null">Sin especificar</option>
-                @for (p of products(); track p.id) {
-                  <option [ngValue]="p.id">{{ p.name }}</option>
-                }
-              </select>
+              <p class="text-xs text-gray-400 mb-3">Tocá para elegir un modelo de la lista.</p>
+              <div class="relative">
+                <select
+                  id="product_id"
+                  [ngModel]="selectedProductId()"
+                  (ngModelChange)="selectedProductId.set($event)"
+                  name="product_id"
+                  class="w-full pl-4 pr-11 py-3 rounded-xl border border-gray-200 text-sm
+                         text-gray-700 bg-white cursor-pointer hover:border-gray-300
+                         focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
+                         transition appearance-none"
+                >
+                  <option [ngValue]="null">Sin especificar</option>
+                  @for (p of products(); track p.id) {
+                    <option [ngValue]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+                <!-- Chevron: señala que el campo despliega una lista -->
+                <svg class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
             </section>
 
             <!-- Calendario -->
@@ -198,14 +206,15 @@ import { ProductService } from '../../core/product.service';
                 <div>
                   <label for="guest_name" class="block text-sm font-medium text-gray-700 mb-1.5">
                     Nombre <span class="text-red-400">*</span>
+                    <span class="text-gray-400 font-normal">(entre 2 y 30 caracteres)</span>
                   </label>
                   <input id="guest_name" name="guest_name" formControlName="guest_name" type="text"
-                         autocomplete="name" placeholder="Juan García" maxlength="30"
+                         autocomplete="name" placeholder="Juan García" minlength="2" maxlength="30"
                          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                 placeholder:text-gray-300
                                 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"/>
                   @if (form.get('guest_name')?.invalid && form.get('guest_name')?.touched) {
-                    <p class="mt-1.5 text-xs text-red-400">Nombre requerido (máx. 30 caracteres)</p>
+                    <p class="mt-1.5 text-xs text-red-400">El nombre debe tener entre 2 y 30 caracteres.</p>
                   }
                 </div>
 
@@ -396,7 +405,10 @@ export class BookingComponent implements OnInit {
 
   ngOnInit(): void {
     const productParam = this.route.snapshot.queryParamMap.get('product');
-    if (productParam) this.selectedProductId.set(parseInt(productParam, 10));
+    if (productParam) {
+      const id = parseInt(productParam, 10);
+      if (!Number.isNaN(id) && id > 0) this.selectedProductId.set(id);
+    }
   }
 
   protected _loadData(): void {

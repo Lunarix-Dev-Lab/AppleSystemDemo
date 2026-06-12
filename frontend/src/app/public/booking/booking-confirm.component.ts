@@ -97,8 +97,10 @@ import { Appointment } from '../../core/appointment.models';
               Código de turno
             </p>
             <p class="text-xs text-gray-400 mb-3 leading-relaxed">
-              Guardalo. Si perdés el email de confirmación podés usarlo para cancelar tu turno en
-              <span class="font-medium text-gray-500">/turnos/cancelar</span>.
+              Guardalo. Si perdés el email de confirmación, vas a poder cancelar tu turno
+              ingresando este código en la sección
+              <a routerLink="/turnos/cancelar"
+                 class="font-medium text-gray-600 underline hover:text-gray-900">Gestionar mi turno</a>.
             </p>
 
             <div class="flex items-center gap-2">

@@ -1,3 +1,4 @@
+import shutil
 import uuid
 from io import BytesIO
 from pathlib import Path
@@ -7,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import require_admin
+from app.api.deps import get_current_user_optional, require_admin
 from app.core.database import get_db
 from app.models.product import Product
+from app.models.user import User
 from app.models.product_image import ProductImage
 from app.schemas.product import (
     ImageReorderRequest,
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 _MEDIA_ROOT = Path("media/products")
 _ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+_MAX_IMAGES_PER_PRODUCT = 12
 
 
 async def _get_or_404(product_id: int, db: AsyncSession) -> Product:
@@ -43,8 +46,13 @@ async def _get_or_404(product_id: int, db: AsyncSession) -> Product:
 @router.get("", response_model=list[ProductOut])
 async def list_products(
     active_only: bool = True,
+    user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
+    # Los productos inactivos solo son visibles para usuarios autenticados:
+    # sin esto, cualquiera podría listar los ocultos con ?active_only=false
+    if user is None:
+        active_only = True
     stmt = (
         select(Product)
         .options(selectinload(Product.images))
@@ -56,8 +64,15 @@ async def list_products(
 
 
 @router.get("/{product_id}", response_model=ProductOut)
-async def get_product(product_id: int, db: AsyncSession = Depends(get_db)):
-    return await _get_or_404(product_id, db)
+async def get_product(
+    product_id: int,
+    user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    product = await _get_or_404(product_id, db)
+    if not product.is_active and user is None:
+        raise HTTPException(404, "Producto no encontrado")
+    return product
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
@@ -93,6 +108,8 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
     product = await _get_or_404(product_id, db)
     await db.delete(product)
     await db.commit()
+    # Sin esto los archivos de imágenes quedan huérfanos y llenan el disco
+    shutil.rmtree(_MEDIA_ROOT / str(product_id), ignore_errors=True)
 
 
 # ── Images ────────────────────────────────────────────────────────────────────
@@ -106,6 +123,14 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
 async def upload_image(
     product_id: int, file: UploadFile, db: AsyncSession = Depends(get_db)
 ):
+    # Validar producto ANTES de procesar/escribir: si no existe, no queda
+    # ningún archivo huérfano en disco.
+    product = await _get_or_404(product_id, db)
+    if len(product.images) >= _MAX_IMAGES_PER_PRODUCT:
+        raise HTTPException(
+            400, f"Máximo {_MAX_IMAGES_PER_PRODUCT} imágenes por producto"
+        )
+
     if file.content_type not in _ALLOWED_TYPES:
         raise HTTPException(400, "Solo se permiten imágenes JPEG, PNG o WEBP")
 
@@ -126,7 +151,6 @@ async def upload_image(
     except Exception as exc:
         raise HTTPException(400, f"Imagen inválida: {exc}") from exc
 
-    product = await _get_or_404(product_id, db)
     image = ProductImage(
         product_id=product_id,
         url=f"/media/products/{product_id}/{filename}",

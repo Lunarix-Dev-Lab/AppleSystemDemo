@@ -46,6 +46,21 @@ export const routes: Routes = [
           import('./public/cancel/cancel.component').then(m => m.CancelComponent),
       },
       {
+        path: 'terminos',
+        loadComponent: () =>
+          import('./public/legal/terms.component').then(m => m.TermsComponent),
+      },
+      {
+        path: 'privacidad',
+        loadComponent: () =>
+          import('./public/legal/privacy.component').then(m => m.PrivacyComponent),
+      },
+      {
+        path: 'cookies',
+        loadComponent: () =>
+          import('./public/legal/cookies.component').then(m => m.CookiesComponent),
+      },
+      {
         path: 'admin',
         loadChildren: () =>
           import('./admin/admin.routes').then(m => m.adminRoutes),

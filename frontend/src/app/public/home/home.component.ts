@@ -3,17 +3,18 @@ import { RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 
 import { THEME } from '../../../theme.config';
+import { SiteFooterComponent } from '../../shared/site-footer/site-footer.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, SiteFooterComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-white flex flex-col">
 
       <!-- Hero -->
-      <main class="flex-1 flex flex-col items-center justify-center text-center px-6 py-24">
+      <main class="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 sm:py-24">
 
         <!-- Badge -->
         <span class="inline-flex items-center gap-2 text-xs font-semibold text-gray-400
@@ -23,7 +24,7 @@ import { THEME } from '../../../theme.config';
         </span>
 
         <!-- Store name -->
-        <h1 class="text-6xl sm:text-7xl font-semibold tracking-tight text-gray-900 leading-none">
+        <h1 class="text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight text-gray-900 leading-none break-words max-w-full">
           {{ name }}
         </h1>
 
@@ -107,6 +108,8 @@ import { THEME } from '../../../theme.config';
           }
         </div>
       </footer>
+
+      <app-site-footer />
 
     </div>
   `,

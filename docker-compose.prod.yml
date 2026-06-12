@@ -30,7 +30,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    # --proxy-headers: tomar la IP real del cliente desde X-Forwarded-For (nginx).
+    # Sin esto, el rate limiting por IP vería a todos los clientes como nginx.
+    # Seguro porque el backend no expone puertos: solo nginx puede alcanzarlo.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
 
   frontend:
     build:
@@ -40,6 +43,9 @@ services:
     environment:
       PORT: 4000
       API_URL: http://backend:8000
+      # Hosts permitidos para el render SSR (tu dominio o la IP pública del VPS).
+      # Si no coincide, el sitio igual funciona pero rinde en el cliente (peor SEO).
+      ALLOWED_SSR_HOSTS: ${ALLOWED_SSR_HOSTS:-localhost,127.0.0.1}
     # Puerto NO expuesto directamente — nginx hace de proxy
     depends_on:
       - backend

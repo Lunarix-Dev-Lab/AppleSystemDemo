@@ -25,7 +25,7 @@ interface SlotConfig {
   imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-8 max-w-xl">
+    <div class="p-4 sm:p-8 max-w-xl">
 
       <div class="mb-8">
         <h1 class="text-2xl font-semibold text-gray-900">Configuración de turnos</h1>

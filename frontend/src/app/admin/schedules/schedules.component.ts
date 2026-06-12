@@ -26,7 +26,7 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-8 max-w-3xl">
+    <div class="p-4 sm:p-8 max-w-3xl">
 
       <div class="mb-8">
         <h1 class="text-2xl font-semibold text-gray-900">Horarios de atención</h1>
@@ -69,12 +69,12 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
       } @else {
         <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           @for (sch of schedules(); track sch.id; let last = $last) {
-            <div class="flex items-center gap-4 px-5 py-4"
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4"
                  [class.border-b]="!last"
                  [class.border-gray-50]="!last">
 
               <!-- Día + toggle -->
-              <div class="w-36 flex items-center gap-2.5 shrink-0">
+              <div class="w-full sm:w-36 flex items-center gap-2.5 shrink-0">
                 <button
                   type="button"
                   (click)="toggleDay(sch)"

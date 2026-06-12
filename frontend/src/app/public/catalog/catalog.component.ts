@@ -15,19 +15,20 @@ import { THEME } from '../../../theme.config';
 import { Product, ProductImage } from '../../core/product.models';
 import { ProductService } from '../../core/product.service';
 import { AppointmentService } from '../../core/appointment.service';
+import { SiteFooterComponent } from '../../shared/site-footer/site-footer.component';
 
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, SiteFooterComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-white">
 
       <!-- Hero -->
-      <header class="px-6 pt-24 pb-14 max-w-[1200px] mx-auto">
+      <header class="px-6 pt-20 sm:pt-24 pb-10 sm:pb-14 max-w-[1200px] mx-auto">
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-[0.2em] mb-4">Catálogo</p>
-        <h1 class="text-5xl sm:text-6xl font-semibold tracking-tight text-gray-900 leading-none">
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-gray-900 leading-none break-words">
           {{ storeName }}
         </h1>
         <p class="mt-4 text-lg text-gray-400 max-w-md leading-relaxed">
@@ -188,6 +189,8 @@ import { AppointmentService } from '../../core/appointment.service';
         }
 
       </main>
+
+      <app-site-footer />
     </div>
   `,
 })

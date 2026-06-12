@@ -20,10 +20,10 @@ import { ProductService } from '../../core/product.service';
   imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-8 max-w-6xl mx-auto">
+    <div class="p-4 sm:p-8 max-w-6xl mx-auto">
 
       <!-- Header -->
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center justify-between gap-3 mb-6 sm:mb-8">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900">Productos</h1>
           <p class="text-sm text-gray-400 mt-0.5">{{ products().length }} en total</p>
@@ -56,8 +56,8 @@ import { ProductService } from '../../core/product.service';
           <p class="text-sm font-medium text-gray-400">Sin productos. Crea el primero.</p>
         </div>
       } @else {
-        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <table class="w-full">
+        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto">
+          <table class="w-full min-w-[640px]">
             <thead>
               <tr class="border-b border-gray-100">
                 <th class="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Producto</th>
@@ -182,7 +182,7 @@ import { ProductService } from '../../core/product.service';
                     max-h-[90vh] overflow-y-auto">
 
           <!-- Modal header -->
-          <div class="flex items-center justify-between px-7 pt-7 pb-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
+          <div class="flex items-center justify-between px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
             <h2 class="text-lg font-semibold text-gray-900">
               {{ editing() ? 'Editar producto' : 'Nuevo producto' }}
             </h2>
@@ -194,7 +194,7 @@ import { ProductService } from '../../core/product.service';
             </button>
           </div>
 
-          <form [formGroup]="form" (ngSubmit)="save()" class="px-7 py-6 space-y-5">
+          <form [formGroup]="form" (ngSubmit)="save()" class="px-5 sm:px-7 py-6 space-y-5">
 
             <!-- Nombre * -->
             <div>
@@ -403,7 +403,7 @@ import { ProductService } from '../../core/product.service';
 
           <!-- ── Gestión de imágenes (solo en edición) ── -->
           @if (editing(); as product) {
-            <div class="px-7 pb-7 border-t border-gray-100 pt-6">
+            <div class="px-5 sm:px-7 pb-6 sm:pb-7 border-t border-gray-100 pt-6">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-gray-900">Fotos</h3>
                 <label class="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200
@@ -425,7 +425,7 @@ import { ProductService } from '../../core/product.service';
                   Sin fotos. La primera imagen subida será la principal.
                 </p>
               } @else {
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   @for (img of product.images; track img.id) {
                     <div class="relative group/img aspect-square rounded-xl overflow-hidden bg-gray-100">
                       <img [src]="img.url" [alt]="'Foto ' + img.order"

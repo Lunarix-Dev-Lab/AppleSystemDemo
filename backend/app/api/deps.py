@@ -10,6 +10,7 @@ from app.core.security import decode_token
 from app.models.user import User, UserRole
 
 _bearer = HTTPBearer(auto_error=True)
+_bearer_optional = HTTPBearer(auto_error=False)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -35,6 +36,27 @@ async def get_current_user(
     user = await db.get(User, user_id)
     if not user or not user.is_active:
         raise exc
+    return user
+
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_optional),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Como get_current_user pero devuelve None en vez de 401.
+
+    Para endpoints públicos que muestran más datos a un admin logueado.
+    """
+    if not credentials:
+        return None
+    try:
+        payload = decode_token(credentials.credentials)
+        user_id = int(payload["sub"])
+    except (JWTError, ValueError, KeyError):
+        return None
+    user = await db.get(User, user_id)
+    if not user or not user.is_active:
+        return None
     return user
 
 

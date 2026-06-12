@@ -1,0 +1,7 @@
+# Override temporal para testear cuando el puerto 8000 está ocupado
+# por otro proyecto. Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.testport.yml up -d
+services:
+  backend:
+    ports: !override
+      - "18000:8000"

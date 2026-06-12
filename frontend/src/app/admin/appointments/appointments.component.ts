@@ -27,39 +27,55 @@ interface Tab {
     <div class="p-4 sm:p-8 max-w-6xl mx-auto">
 
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div class="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900">Turnos</h1>
           <p class="text-sm text-gray-400 mt-0.5">{{ appointments().length }} en total</p>
         </div>
 
-        <!-- limpiar cancelados -->
-        @if (cancelledCount() > 0) {
-          <button (click)="deleteCancelled()"
+        <div class="flex items-center gap-2 flex-wrap">
+
+          <!-- orden por fecha -->
+          <button (click)="toggleSort()"
                   class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                         border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-500
-                         transition-colors min-h-[40px]">
+                         border border-gray-200 text-gray-600 hover:bg-gray-50
+                         transition-colors min-h-[40px]"
+                  [attr.aria-label]="sortDir() === 'desc' ? 'Ordenar: más recientes primero' : 'Ordenar: más antiguos primero'">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                d="M7 16V4m0 0L4 7m3-3l3 3M17 8v12m0 0l3-3m-3 3l-3-3"/>
             </svg>
-            Limpiar cancelados ({{ cancelledCount() }})
+            {{ sortDir() === 'desc' ? 'Más recientes' : 'Más antiguos' }}
           </button>
-        }
 
-        <!-- filtro activos / todos -->
-        <button (click)="toggleActive()"
-                class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                       transition-colors min-h-[40px]"
-                [class]="onlyActive()
-                  ? 'bg-black text-white hover:bg-gray-800'
-                  : 'border border-gray-200 text-gray-600 hover:bg-gray-50'">
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
-          </svg>
-          {{ onlyActive() ? 'Ver todos' : 'Solo activos' }}
-        </button>
+          <!-- limpiar cancelados -->
+          @if (cancelledCount() > 0) {
+            <button (click)="deleteCancelled()"
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                           border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-500
+                           transition-colors min-h-[40px]">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+              Limpiar cancelados ({{ cancelledCount() }})
+            </button>
+          }
+
+          <!-- filtro activos / todos -->
+          <button (click)="toggleActive()"
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                         transition-colors min-h-[40px]"
+                  [class]="onlyActive()
+                    ? 'bg-black text-white hover:bg-gray-800'
+                    : 'border border-gray-200 text-gray-600 hover:bg-gray-50'">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+            </svg>
+            {{ onlyActive() ? 'Ver todos' : 'Solo activos' }}
+          </button>
+        </div>
       </div>
 
       <!-- Status tabs -->
@@ -202,6 +218,17 @@ interface Tab {
       }
     </div>
 
+    <!-- Toast de feedback -->
+    @if (successMsg()) {
+      <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2
+                  bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-xl">
+        <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+        {{ successMsg() }}
+      </div>
+    }
+
     <!-- QA-ADM-005: modal de motivo de cancelación -->
     @if (cancelTarget()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -254,6 +281,12 @@ export class AppointmentsComponent implements OnInit {
   // Filtro activos por defecto
   readonly onlyActive = signal(true);
 
+  // Orden por fecha del turno: 'desc' = más recientes primero
+  readonly sortDir = signal<'desc' | 'asc'>('desc');
+
+  // Toast de feedback (cancelar/confirmar/realizado)
+  readonly successMsg = signal('');
+
   // QA-ADM-005: modal de motivo de cancelación
   readonly cancelTarget = signal<Appointment | null>(null);
   readonly cancelReason = signal('');
@@ -274,13 +307,18 @@ export class AppointmentsComponent implements OnInit {
   readonly filtered = computed(() => {
     const status = this.filterStatus();
     const active = this.onlyActive();
-    const list = this.appointments();
+    const dir = this.sortDir();
+    let list = this.appointments();
     // Si hay una tab específica seleccionada, toma prioridad sobre el filtro activos
-    if (status) return list.filter(a => a.status === status);
-    if (active) return list.filter(a =>
+    if (status) list = list.filter(a => a.status === status);
+    else if (active) list = list.filter(a =>
       a.status === 'pending_confirmation' || a.status === 'confirmed'
     );
-    return list;
+    // Orden por fecha del turno (copia para no mutar la señal)
+    return [...list].sort((a, b) => {
+      const diff = this._parse(a.slot_datetime).getTime() - this._parse(b.slot_datetime).getTime();
+      return dir === 'desc' ? -diff : diff;
+    });
   });
 
   ngOnInit(): void {
@@ -308,6 +346,15 @@ export class AppointmentsComponent implements OnInit {
     if (next) this.filterStatus.set(null); // volver a "Todos" al activar el filtro
   }
 
+  toggleSort(): void {
+    this.sortDir.update(d => (d === 'desc' ? 'asc' : 'desc'));
+  }
+
+  private _notify(msg: string): void {
+    this.successMsg.set(msg);
+    setTimeout(() => this.successMsg.set(''), 3000);
+  }
+
   tabCount(status: AppointmentStatus | null): number {
     const all = this.appointments();
     if (!status) return all.length;
@@ -333,6 +380,7 @@ export class AppointmentsComponent implements OnInit {
         this.appointments.update(list => list.map(a => a.id === updated.id ? updated : a));
         this.updating.set(null);
         this.closeCancelModal();
+        this._notify('Turno cancelado exitosamente.');
       },
       error: () => this.updating.set(null),
     });
@@ -344,6 +392,11 @@ export class AppointmentsComponent implements OnInit {
       next: updated => {
         this.appointments.update(list => list.map(a => a.id === updated.id ? updated : a));
         this.updating.set(null);
+        this._notify(
+          status === 'confirmed' ? 'Turno confirmado exitosamente.'
+          : status === 'realizado' ? 'Turno marcado como realizado.'
+          : 'Turno actualizado.'
+        );
       },
       error: () => this.updating.set(null),
     });

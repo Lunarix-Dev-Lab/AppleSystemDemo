@@ -16,7 +16,7 @@ interface Stats {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-8 max-w-4xl">
+    <div class="p-4 sm:p-8 max-w-4xl">
       <div class="mb-8">
         <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
         @if (auth.currentUser(); as user) {

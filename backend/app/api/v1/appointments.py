@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import date, datetime, timedelta
 from hashlib import sha256
 from zoneinfo import ZoneInfo
@@ -11,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import require_admin
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.ratelimit import RateLimiter
 from app.core.notifications import (
     AptNotif,
     notify_cancelled,
@@ -38,21 +38,8 @@ def _slot_lock_key(slot_dt: datetime) -> int:
 
 _ACTIVE = (AppointmentStatus.pending_confirmation, AppointmentStatus.confirmed)
 
-# ── Rate limiting in-memory (QA-RES-004) ─────────────────────────────────────
-# Sin dependencias externas: dict IP → lista de timestamps de los últimos 60s
-_rl_log: dict[str, list[datetime]] = defaultdict(list)
-_RL_MAX = 10          # máx solicitudes por ventana
-_RL_WINDOW_SEC = 60   # ventana de tiempo en segundos
-
-
-def _rate_ok(ip: str) -> bool:
-    now = datetime.now()
-    cutoff = now - timedelta(seconds=_RL_WINDOW_SEC)
-    _rl_log[ip] = [t for t in _rl_log[ip] if t > cutoff]
-    if len(_rl_log[ip]) >= _RL_MAX:
-        return False
-    _rl_log[ip].append(now)
-    return True
+# ── Rate limiting (QA-RES-004): 10 reservas por minuto por IP ────────────────
+_create_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -130,7 +117,7 @@ async def create_appointment(
 ):
     # QA-RES-004: rate limiting por IP
     client_ip = (request.client.host if request.client else None) or "unknown"
-    if not _rate_ok(client_ip):
+    if not _create_limiter.allow(client_ip):
         raise HTTPException(
             429,
             "Demasiadas solicitudes. Esperá unos minutos antes de intentar de nuevo.",
@@ -261,6 +248,37 @@ async def update_status(
     db: AsyncSession = Depends(get_db),
 ):
     appointment = await _load(appointment_id, db)
+
+    # Idempotente: repetir el mismo estado no hace nada (evita que clicks
+    # repetidos del admin manden el mismo email varias veces).
+    if data.status == appointment.status:
+        return appointment
+
+    # Resucitar un turno cancelado solo si el slot todavía tiene lugar:
+    # mientras estuvo cancelado, otros clientes pudieron ocupar su cupo.
+    if appointment.status == AppointmentStatus.cancelled and data.status in _ACTIVE:
+        # asyncpg devuelve el datetime aware en UTC; convertir a hora argentina
+        # naive para que coincida con la representación usada al crear turnos.
+        slot_dt = appointment.slot_datetime
+        if slot_dt.tzinfo is not None:
+            slot_dt = slot_dt.astimezone(_ART).replace(tzinfo=None)
+        await db.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": _slot_lock_key(slot_dt)},
+        )
+        config = (await db.execute(select(SlotConfig).limit(1))).scalar_one()
+        occupied = (
+            await db.execute(
+                select(func.count(Appointment.id))
+                .where(Appointment.slot_datetime == slot_dt)
+                .where(Appointment.status.in_(_ACTIVE))
+            )
+        ).scalar()
+        if occupied >= config.max_per_slot:
+            raise HTTPException(
+                409, "El horario ya no tiene disponibilidad para reactivar este turno"
+            )
+
     notif_data = _notif(appointment)
 
     appointment.status = data.status

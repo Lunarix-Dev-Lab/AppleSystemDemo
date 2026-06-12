@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # ── Admin inicial ─────────────────────────────────────────────────────────
+    # Usados por create_admin.py para crear/actualizar el usuario administrador.
+    # No se usan en ningún endpoint: solo en el script de provisión.
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+
     # ── CORS ─────────────────────────────────────────────────────────────────
     # En .env: ALLOWED_ORIGINS=["http://localhost:4000"] (JSON array)
     ALLOWED_ORIGINS: list[str] = ["http://localhost:4000"]

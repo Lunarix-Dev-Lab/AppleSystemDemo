@@ -14,7 +14,16 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        # Hash malformado en DB → credencial inválida, nunca un 500
+        return False
+
+
+# Hash de sacrificio: se verifica cuando el email no existe para que el tiempo
+# de respuesta sea igual al de un email válido (evita enumeración por timing).
+DUMMY_HASH = bcrypt.hashpw(b"timing-equalizer", bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(subject: Any, extra: dict | None = None) -> str:

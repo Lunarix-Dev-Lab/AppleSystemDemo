@@ -15,6 +15,14 @@ from app.core.config import get_settings
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+# Nunca arrancar en producción con la clave de desarrollo: cualquiera que lea
+# el código fuente podría firmar sus propios JWT de admin.
+if not settings.DEBUG and settings.SECRET_KEY == "dev-secret-change-in-production":
+    raise RuntimeError(
+        "SECRET_KEY no configurada. Generá una con `openssl rand -hex 32` "
+        "y definila en .env antes de arrancar en producción."
+    )
+
 
 # QA-ADM-002: auto-cancelación de no-shows ────────────────────────────────────
 # Cada 30 min cancela turnos pendientes/confirmados cuya hora ya pasó hace >1h.
@@ -58,13 +66,15 @@ async def lifespan(app: FastAPI):
         pass
 
 
+# La documentación interactiva solo se expone con DEBUG=true: en producción
+# no conviene publicar el mapa completo de la API.
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
+    openapi_url="/api/openapi.json" if settings.DEBUG else None,
 )
 
 app.add_middleware(

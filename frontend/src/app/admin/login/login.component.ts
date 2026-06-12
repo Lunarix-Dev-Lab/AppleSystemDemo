@@ -63,7 +63,7 @@ import { AuthService } from '../../core/auth/auth.service';
                 >
                   @if (showPassword()) {
                     <!-- Eye-off -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
                                a18.45 18.45 0 0 1 5.06-5.94"/>
@@ -73,7 +73,7 @@ import { AuthService } from '../../core/auth/auth.service';
                     </svg>
                   } @else {
                     <!-- Eye -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4.5 h-4.5" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                       <circle cx="12" cy="12" r="3"/>
@@ -124,8 +124,13 @@ export class LoginComponent {
     const { email, password } = this.form.getRawValue();
     this.auth.login({ email: email!, password: password! }).subscribe({
       next: () => this.router.navigate(['/admin']),
-      error: () => {
-        this.error.set('Email o contraseña incorrectos');
+      error: err => {
+        // 429 (rate limit) trae su propio mensaje; no confundir con credenciales
+        this.error.set(
+          err.status === 429 && err.error?.detail
+            ? err.error.detail
+            : 'Email o contraseña incorrectos',
+        );
         this.loading.set(false);
       },
     });
