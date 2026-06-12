@@ -3,6 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+_ART = ZoneInfo("America/Argentina/Buenos_Aires")
 
 # Nunca arrancar en producción con la clave de desarrollo: cualquiera que lea
 # el código fuente podría firmar sus propios JWT de admin.
@@ -37,7 +39,8 @@ async def _auto_cancel_noshow() -> None:
     while True:
         await asyncio.sleep(30 * 60)  # ejecutar cada 30 minutos
         try:
-            cutoff = datetime.now() - timedelta(hours=1)
+            # Hora de pared ART (no depende de la TZ del contenedor)
+            cutoff = datetime.now(_ART).replace(tzinfo=None) - timedelta(hours=1)
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
                     select(Appointment)

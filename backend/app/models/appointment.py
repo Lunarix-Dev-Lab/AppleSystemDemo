@@ -39,9 +39,10 @@ class Appointment(Base):
     guest_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     guest_phone: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    # Franja reservada (fecha + hora exacta)
+    # Franja reservada (fecha + hora exacta) como hora de pared ART, SIN zona.
+    # Guardar naive evita conversiones de timezone que corrían la hora mostrada.
     slot_datetime: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        DateTime(timezone=False), nullable=False, index=True
     )
 
     # Producto de interés (opcional)
