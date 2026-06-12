@@ -245,11 +245,12 @@ export class CatalogComponent implements OnInit {
   }
 
   formatPrice(price: number): string {
-    const p = Number(price);
+    // price es el precio base en USD. El ARS se deriva con la cotización.
+    const usd = Number(price);
     if (this.currency() === 'USD') {
-      const usd = Math.round(p / this.usdRate());
-      return `USD ${usd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+      return `USD ${Math.round(usd).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
     }
-    return `$${p.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    const ars = Math.round(usd * this.usdRate());
+    return `$${ars.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
   }
 }

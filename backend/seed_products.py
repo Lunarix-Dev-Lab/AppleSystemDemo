@@ -126,12 +126,13 @@ async def main() -> None:
                 sys.exit(1)
             rate = float(config.usd_rate)
 
-            print(f"Tipo de cambio configurado: 1 USD = {rate:.0f} ARS")
+            # price = precio base en USD. El ARS se deriva al mostrar (price * cotización).
+            print(f"Cargando precios en USD (cotización actual solo informativa: 1 USD = {rate:.0f} ARS)")
             for p in PRODUCTS:
                 product = Product(
                     name=p["name"],
                     description=p["desc"],
-                    price=round(p["usd"] * rate),
+                    price=p["usd"],
                     colors=p["colors"],
                     storage_options=p["storage"],
                     stock=p["stock"],
@@ -150,7 +151,7 @@ async def main() -> None:
                     print(f"  ! aviso: falta la imagen {src.name}, el producto queda sin foto")
 
                 await db.commit()
-                print(f"  + {p['name']}  (USD {p['usd']} = ARS {round(p['usd'] * rate)})")
+                print(f"  + {p['name']}  (USD {p['usd']} ≈ ARS {round(p['usd'] * rate)})")
     finally:
         await engine.dispose()
 

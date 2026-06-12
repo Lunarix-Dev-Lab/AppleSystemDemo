@@ -8,8 +8,7 @@ import {
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { firstValueFrom, forkJoin } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 import { Product, ProductImage } from '../../core/product.models';
 import { ProductService } from '../../core/product.service';
@@ -460,12 +459,10 @@ import { ProductService } from '../../core/product.service';
 })
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
-  private readonly http = inject(HttpClient);
   private readonly fb = inject(FormBuilder);
   private readonly platform = inject(PLATFORM_ID);
 
   readonly products = signal<Product[]>([]);
-  readonly usdRate = signal(1000);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly savedMsg = signal(false);
@@ -499,15 +496,8 @@ export class ProductsComponent implements OnInit {
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
-    forkJoin({
-      products: this.productService.list(false),
-      config: this.http.get<{ usd_rate: number }>('/api/v1/config'),
-    }).subscribe({
-      next: ({ products, config }) => {
-        this.products.set(products);
-        this.usdRate.set(Number(config.usd_rate));
-        this.loading.set(false);
-      },
+    this.productService.list(false).subscribe({
+      next: products => { this.products.set(products); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
@@ -549,7 +539,7 @@ export class ProductsComponent implements OnInit {
     this.form.patchValue({
       name: product.name,
       description: product.description ?? '',
-      price: Math.round(product.price / this.usdRate()),
+      price: Number(product.price),
       stock: product.stock,
       is_active: product.is_active,
       is_sealed: product.is_sealed,
@@ -573,7 +563,7 @@ export class ProductsComponent implements OnInit {
     const payload = {
       name: raw.name!,
       description: raw.description || null,
-      price: Math.round(raw.price! * this.usdRate()),
+      price: raw.price!,
       stock: raw.stock!,
       is_active: raw.is_active!,
       colors: this.formColors(),
@@ -702,7 +692,7 @@ export class ProductsComponent implements OnInit {
   }
 
   formatPrice(price: number): string {
-    const usd = Math.round(Number(price) / this.usdRate());
-    return `USD ${usd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    // price ya está en USD (precio base de referencia)
+    return `USD ${Math.round(Number(price)).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
   }
 }
