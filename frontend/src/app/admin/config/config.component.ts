@@ -55,6 +55,7 @@ interface SlotConfig {
                 name="slot_duration_minutes"
                 formControlName="slot_duration_minutes"
                 type="number"
+                autocomplete="off"
                 min="15"
                 max="240"
                 step="15"
@@ -79,6 +80,7 @@ interface SlotConfig {
                 name="max_per_slot"
                 formControlName="max_per_slot"
                 type="number"
+                autocomplete="off"
                 min="1"
                 max="20"
                 step="1"
@@ -102,6 +104,7 @@ interface SlotConfig {
                 name="max_advance_days"
                 formControlName="max_advance_days"
                 type="number"
+                autocomplete="off"
                 min="1"
                 max="365"
                 step="1"
@@ -120,10 +123,13 @@ interface SlotConfig {
             <div class="flex items-center gap-3">
               <span class="text-sm text-gray-500 shrink-0">1 USD =</span>
               <input
+                id="usd_rate"
                 formControlName="usd_rate"
                 type="number"
                 min="1"
                 step="1"
+                autocomplete="off"
+                aria-label="Cotización del dólar en pesos"
                 class="w-36 px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                        focus:outline-none focus:ring-2 focus:ring-black transition"
               />

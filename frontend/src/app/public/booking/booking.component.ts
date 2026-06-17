@@ -92,6 +92,7 @@ import { ProductService } from '../../core/product.service';
               <div class="relative">
                 <select
                   id="product_id"
+                  autocomplete="off"
                   [ngModel]="selectedProductId()"
                   (ngModelChange)="selectedProductId.set($event)"
                   name="product_id"
@@ -253,7 +254,7 @@ import { ProductService } from '../../core/product.service';
                   <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">
                     Notas <span class="text-gray-400 font-normal">(opcional, máx. 30 caracteres)</span>
                   </label>
-                  <input id="notes" name="notes" formControlName="notes" type="text" maxlength="30"
+                  <input id="notes" name="notes" formControlName="notes" type="text" maxlength="30" autocomplete="off"
                          placeholder="ej. Prefiero turno a la tarde"
                          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                 placeholder:text-gray-300

@@ -101,6 +101,7 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
                     <input
                       [id]="'open_' + sch.id"
                       type="time"
+                      autocomplete="off"
                       [(ngModel)]="sch.open_time"
                       class="px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm
                              focus:outline-none focus:ring-2 focus:ring-black transition"
@@ -112,6 +113,7 @@ const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
                     <input
                       [id]="'close_' + sch.id"
                       type="time"
+                      autocomplete="off"
                       [(ngModel)]="sch.close_time"
                       class="px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm
                              focus:outline-none focus:ring-2 focus:ring-black transition"

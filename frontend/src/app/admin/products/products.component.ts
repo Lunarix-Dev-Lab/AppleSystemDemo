@@ -55,8 +55,69 @@ import { ProductService } from '../../core/product.service';
           <p class="text-sm font-medium text-gray-400">Sin productos. Crea el primero.</p>
         </div>
       } @else {
-        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto">
-          <table class="w-full min-w-[640px]">
+
+        <!-- Mobile: tarjetas -->
+        <div class="md:hidden space-y-3">
+          @for (product of products(); track product.id) {
+            <div class="bg-white rounded-2xl border border-gray-100 p-4">
+              <div class="flex gap-3">
+                <div class="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
+                  @if (primaryImage(product); as img) {
+                    <img [src]="img.url" [alt]="product.name" class="w-full h-full object-contain p-1"/>
+                  } @else {
+                    <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                  }
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-gray-900 truncate">{{ product.name }}</p>
+                  @if (product.is_sealed) {
+                    <p class="text-xs text-gray-400 mt-0.5">Sellado</p>
+                  } @else if (product.battery_health) {
+                    <p class="text-xs text-green-500 mt-0.5">{{ product.battery_health }}% bat.</p>
+                  }
+                  <p class="text-sm font-semibold text-gray-900 mt-1">{{ formatPrice(product.price) }}</p>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <button (click)="openEdit(product)"
+                          class="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100
+                                 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                  <button (click)="remove(product)" [disabled]="deleting() === product.id"
+                          class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50
+                                 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center
+                                 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-50">
+                <span class="text-xs text-gray-400">Stock:
+                  <span class="font-medium" [class]="product.stock === 0 ? 'text-red-400' : 'text-gray-600'">{{ product.stock }}</span>
+                </span>
+                <button (click)="toggleActive(product)"
+                        class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors min-h-[36px]"
+                        [class]="product.is_active ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'">
+                  <span class="w-1.5 h-1.5 rounded-full" [class]="product.is_active ? 'bg-green-500' : 'bg-gray-400'"></span>
+                  {{ product.is_active ? 'Activo' : 'Inactivo' }}
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Desktop: tabla -->
+        <div class="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <table class="w-full">
             <thead>
               <tr class="border-b border-gray-100">
                 <th class="text-left px-5 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Producto</th>
@@ -178,10 +239,10 @@ import { ProductService } from '../../core/product.service';
 
         <!-- Panel -->
         <div class="relative z-10 w-full max-w-lg bg-white rounded-3xl shadow-2xl
-                    max-h-[90vh] overflow-y-auto">
+                    max-h-[90vh] flex flex-col">
 
-          <!-- Modal header -->
-          <div class="flex items-center justify-between px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
+          <!-- Modal header (fijo, la X siempre visible) -->
+          <div class="flex items-center justify-between px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-gray-100 shrink-0 bg-white rounded-t-3xl">
             <h2 class="text-lg font-semibold text-gray-900">
               {{ editing() ? 'Editar producto' : 'Nuevo producto' }}
             </h2>
@@ -193,6 +254,8 @@ import { ProductService } from '../../core/product.service';
             </button>
           </div>
 
+          <!-- Cuerpo scrolleable -->
+          <div class="flex-1 overflow-y-auto">
           <form [formGroup]="form" (ngSubmit)="save()" class="px-5 sm:px-7 py-6 space-y-5">
 
             <!-- Nombre * -->
@@ -200,7 +263,7 @@ import { ProductService } from '../../core/product.service';
               <label for="prod-name" class="block text-sm font-medium text-gray-700 mb-1.5">
                 Nombre <span class="text-red-400">*</span>
               </label>
-              <input id="prod-name" name="name" formControlName="name" type="text"
+              <input id="prod-name" name="name" formControlName="name" type="text" autocomplete="off"
                      placeholder="ej. iPhone 15 Pro"
                      class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                             placeholder:text-gray-300
@@ -214,7 +277,7 @@ import { ProductService } from '../../core/product.service';
             <!-- Descripción -->
             <div>
               <label for="prod-desc" class="block text-sm font-medium text-gray-700 mb-1.5">Descripción</label>
-              <textarea id="prod-desc" name="description" formControlName="description" rows="2"
+              <textarea id="prod-desc" name="description" formControlName="description" rows="2" autocomplete="off"
                         placeholder="Descripción opcional..."
                         class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                                placeholder:text-gray-300 resize-none
@@ -224,7 +287,7 @@ import { ProductService } from '../../core/product.service';
 
             <!-- Condición: Sellado / Usado -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Condición</label>
+              <p class="block text-sm font-medium text-gray-700 mb-1.5">Condición</p>
               <div class="flex gap-2">
                 <button
                   type="button"
@@ -256,6 +319,7 @@ import { ProductService } from '../../core/product.service';
                 <div class="flex items-center gap-3">
                   <input
                     id="prod-battery"
+                    autocomplete="off"
                     name="battery_health"
                     formControlName="battery_health"
                     type="number"
@@ -284,7 +348,7 @@ import { ProductService } from '../../core/product.service';
                 <label for="prod-price" class="block text-sm font-medium text-gray-700 mb-1.5">
                   Precio (USD) <span class="text-red-400">*</span>
                 </label>
-                <input id="prod-price" name="price" formControlName="price" type="number" min="0" max="99999999"
+                <input id="prod-price" name="price" formControlName="price" type="number" min="0" max="99999999" autocomplete="off"
                        placeholder="ej. 900"
                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                               placeholder:text-gray-300
@@ -298,7 +362,7 @@ import { ProductService } from '../../core/product.service';
                 <label for="prod-stock" class="block text-sm font-medium text-gray-700 mb-1.5">
                   Stock <span class="text-red-400">*</span>
                 </label>
-                <input id="prod-stock" name="stock" formControlName="stock" type="number" min="0" max="99999"
+                <input id="prod-stock" name="stock" formControlName="stock" type="number" min="0" max="99999" autocomplete="off"
                        placeholder="0"
                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                               placeholder:text-gray-300
@@ -312,7 +376,7 @@ import { ProductService } from '../../core/product.service';
 
             <!-- Colores (tag input) -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Colores</label>
+              <label for="prod-color-tag" class="block text-sm font-medium text-gray-700 mb-1.5">Colores</label>
               <div class="flex flex-wrap gap-1.5 p-2.5 bg-gray-50 border border-gray-200 rounded-xl min-h-[44px]">
                 @for (color of formColors(); track color; let i = $index) {
                   <span class="flex items-center gap-1 px-2.5 py-1 bg-white border border-gray-200
@@ -324,6 +388,9 @@ import { ProductService } from '../../core/product.service';
                 }
                 <input
                   type="text"
+                  id="prod-color-tag"
+                  autocomplete="off"
+                  aria-label="Agregar color"
                   [value]="colorInput()"
                   (input)="colorInput.set($any($event.target).value)"
                   (keydown)="onTagKey($event, 'color')"
@@ -336,7 +403,7 @@ import { ProductService } from '../../core/product.service';
 
             <!-- Almacenamiento (tag input) -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Almacenamiento</label>
+              <label for="prod-storage-tag" class="block text-sm font-medium text-gray-700 mb-1.5">Almacenamiento</label>
               <div class="flex flex-wrap gap-1.5 p-2.5 bg-gray-50 border border-gray-200 rounded-xl min-h-[44px]">
                 @for (opt of formStorages(); track opt; let i = $index) {
                   <span class="flex items-center gap-1 px-2.5 py-1 bg-white border border-gray-200
@@ -348,6 +415,9 @@ import { ProductService } from '../../core/product.service';
                 }
                 <input
                   type="text"
+                  id="prod-storage-tag"
+                  autocomplete="off"
+                  aria-label="Agregar almacenamiento"
                   [value]="storageInput()"
                   (input)="storageInput.set($any($event.target).value)"
                   (keydown)="onTagKey($event, 'storage')"
@@ -368,9 +438,9 @@ import { ProductService } from '../../core/product.service';
                 <span class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 mt-0.5"
                       [class]="form.get('is_active')!.value ? 'translate-x-5' : 'translate-x-0.5'"></span>
               </button>
-              <label class="text-sm font-medium text-gray-700">
+              <span class="text-sm font-medium text-gray-700">
                 {{ form.get('is_active')!.value ? 'Activo (visible en vitrina)' : 'Inactivo (oculto)' }}
-              </label>
+              </span>
             </div>
 
             <!-- Toast de éxito -->
@@ -414,7 +484,7 @@ import { ProductService } from '../../core/product.service';
                   </svg>
                   {{ uploading() ? 'Subiendo…' : 'Agregar foto' }}
                   <input #fileInput type="file" accept="image/jpeg,image/png,image/webp"
-                         multiple class="hidden" [disabled]="uploading()"
+                         multiple class="hidden" id="prod-photo" aria-label="Agregar foto" [disabled]="uploading()"
                          (change)="onFileSelect($event, product)"/>
                 </label>
               </div>
@@ -437,8 +507,8 @@ import { ProductService } from '../../core/product.service';
 
                       <button (click)="removeImage(img, product)"
                               [disabled]="deletingImage() === img.id"
-                              class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white
-                                     opacity-0 group-hover/img:opacity-100 transition-opacity
+                              class="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 text-white
+                                     opacity-100 md:opacity-0 md:group-hover/img:opacity-100 transition-opacity
                                      flex items-center justify-center disabled:opacity-40">
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -451,6 +521,7 @@ import { ProductService } from '../../core/product.service';
               }
             </div>
           }
+          </div>
 
         </div>
       </div>
